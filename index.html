@@ -86,13 +86,25 @@
     </div>
 
     <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span style="font-weight: 800; font-size: 1.1rem;">💼 포트폴리오</span>
                 <button class="btn-sub" onclick="refreshAllPrices()" id="refreshBtn">🔄 갱신</button>
             </div>
             <span id="totalYieldDisplay" style="font-size: 1.3rem; font-weight: 900;">0.00%</span>
         </div>
+
+        <div style="display: flex; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 14px 16px; border-radius: 12px; margin-bottom: 16px; border: 1px solid var(--border);">
+            <div>
+                <div style="color:var(--text-sub); font-size: 0.8rem; margin-bottom: 4px;">총 투자금액 <span id="exRateDisplay" style="font-size: 0.7rem; color: #818cf8;"></span></div>
+                <div id="totalInvDisplay" style="font-weight: 800; font-size: 1.1rem; color: white;">0원</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="color:var(--text-sub); font-size: 0.8rem; margin-bottom: 4px;">총 평가손익</div>
+                <div id="totalPlDisplay" style="font-weight: 800; font-size: 1.1rem;">0원</div>
+            </div>
+        </div>
+
         <div id="stockListContainer"></div>
     </div>
 </div>
@@ -130,8 +142,8 @@
 <script>
     let myStocks = JSON.parse(localStorage.getItem('myStocks')) || [];
     let curIdx = -1;
+    let currentExchangeRate = 1330; // 💡 기본 환율 세팅 (오류 대비용)
 
-    // 🚀 한국주식 + 미국주식 + 국내 상장 ETF 완벽 통합 DB
     const localStockDB = [
         { name: "TIME 미국나스닥100액티브", code: "426030" },
         { name: "TIME 미국S&P500액티브", code: "426020" },
@@ -258,7 +270,18 @@
         throw new Error("차단됨");
     }
 
-    // 💡 가격뿐만 아니라 '종목명'까지 같이 가져오도록 업그레이드!
+    // 💡 실시간 원/달러 환율 불러오는 함수 추가
+    async function updateExchangeRate() {
+        try {
+            const url = `https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1d&range=1d`;
+            const data = await fetchWithFallback(url);
+            const parsed = data.contents ? JSON.parse(data.contents) : data;
+            if (parsed && parsed.chart && parsed.chart.result && parsed.chart.result.length > 0) {
+                currentExchangeRate = parsed.chart.result[0].meta.regularMarketPrice;
+            }
+        } catch(e) { console.log("환율 업데이트 실패, 기본값 유지"); }
+    }
+
     async function getRealTimeData(code) {
         const ticker = code.includes('@') ? code.split('@')[1] : code;
         const isUS = /[A-Z]/.test(ticker);
@@ -269,17 +292,22 @@
             const parsed = data.contents ? JSON.parse(data.contents) : data;
             return {
                 price: parseInt(parsed.closePrice.replace(/,/g, '')),
-                name: parsed.stockName || ticker // 서버에서 공식 이름 가져오기
+                name: parsed.stockName || ticker
             };
         } else {
-            const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}`;
+            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
             const data = await fetchWithFallback(url);
             const parsed = data.contents ? JSON.parse(data.contents) : data;
-            const result = parsed.quoteResponse.result[0];
-            return {
-                price: parseFloat(result.regularMarketPrice.toFixed(2)),
-                name: result.shortName || result.longName || ticker // 서버에서 공식 이름 가져오기
-            };
+            
+            if (parsed && parsed.chart && parsed.chart.result && parsed.chart.result.length > 0) {
+                const meta = parsed.chart.result[0].meta;
+                return {
+                    price: parseFloat(meta.regularMarketPrice.toFixed(2)),
+                    name: ticker 
+                };
+            } else {
+                throw new Error("미국 주식 시세 파싱 실패");
+            }
         }
     }
 
@@ -287,6 +315,8 @@
         if(myStocks.length === 0) return;
         const btn = document.getElementById('refreshBtn');
         btn.innerText = "⏳ 갱신중";
+        
+        await updateExchangeRate(); // 💡 환율 먼저 최신화
         
         let isUpdated = false;
         for (let i = 0; i < myStocks.length; i++) {
@@ -301,23 +331,20 @@
         
         if(isUpdated) {
             localStorage.setItem('myStocks', JSON.stringify(myStocks));
-            renderList();
         }
+        renderList(); // 환율이 반영되도록 새로 고침
         btn.innerText = "🔄 갱신";
     }
 
-    // 💡 이름이 빈칸이어도 에러 없이 처리하도록 수정됨
     async function addStock() {
         let name = document.getElementById('sName').value.trim();
         let codeInput = document.getElementById('sCode').value.trim().toUpperCase(); 
         const avg = parseFloat(document.getElementById('sAvg').value);
         const qty = parseFloat(document.getElementById('sQty').value) || 1;
 
-        // 이름, 코드 둘 다 없으면 막기
         if(!name && !codeInput) return alert("종목명이나 종목코드 중 하나는 꼭 적어주세요!");
         if(isNaN(avg)) return alert("평단가를 적어주세요!");
 
-        // 코드가 없고 이름만 영어로 쳤을 경우, 이름을 코드로 대신 사용 시도
         if(!codeInput && name) {
             codeInput = name; 
         }
@@ -331,16 +358,14 @@
         const isUS = /[A-Z]/.test(ticker); 
 
         try {
-            // 서버에서 가격과 이름을 동시에 받아옴!
             const stockData = await getRealTimeData(codeInput);
             currentPrice = stockData.price;
             
-            // 사용자가 이름을 안 적었으면 서버에서 받아온 공식 이름으로 채워줌
             if(!name || name === codeInput) {
                 name = stockData.name;
             }
         } catch (e) {
-            if(!name) name = codeInput; // 에러 났는데 이름도 안 쳤으면 일단 코드를 이름으로 표시
+            if(!name) name = codeInput; 
             const currSymbol = isUS ? '달러($)' : '원';
             const manualPrice = prompt(`방화벽으로 인해 가격을 불러오지 못했습니다.\n'${name}'의 현재가를 ${currSymbol} 단위로 직접 적어주세요!`);
             if(manualPrice) currentPrice = parseFloat(manualPrice.replace(/,/g, ''));
@@ -361,6 +386,8 @@
     async function refreshAllPrices() {
         if(myStocks.length === 0) return;
         document.getElementById('refreshBtn').innerText = "⏳";
+        
+        await updateExchangeRate(); // 💡 갱신 시 환율도 다시 불러옴
         
         for (let i = 0; i < myStocks.length; i++) {
             try {
@@ -395,31 +422,67 @@
     function renderList() {
         const container = document.getElementById('stockListContainer');
         container.innerHTML = '';
-        if(myStocks.length === 0) { container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-sub);">등록된 종목이 없습니다.</div>'; document.getElementById('totalYieldDisplay').innerText = '0.00%'; document.getElementById('totalYieldDisplay').style.color = 'white'; return; }
         
-        let totalInv = 0, totalCur = 0;
+        if(myStocks.length === 0) { 
+            container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-sub);">등록된 종목이 없습니다.</div>'; 
+            document.getElementById('totalYieldDisplay').innerText = '0.00%'; 
+            document.getElementById('totalYieldDisplay').style.color = 'white'; 
+            document.getElementById('totalInvDisplay').innerText = '0원';
+            document.getElementById('totalPlDisplay').innerText = '0원';
+            document.getElementById('totalPlDisplay').style.color = 'white';
+            document.getElementById('exRateDisplay').innerText = '';
+            return; 
+        }
+        
+        // 💡 총액은 오직 '원화(KRW)' 기준으로만 합산하기 위한 변수
+        let totalInvKRW = 0, totalCurKRW = 0;
+        
         myStocks.forEach((s, i) => {
-            totalInv += s.avgPrice * s.quantity; totalCur += s.currentPrice * s.quantity;
+            const isUS = /[a-zA-Z]/.test(s.code);
+            const currSymbol = isUS ? '$' : '원';
+            
+            // 각 주식의 고유 통화 기준 투자금과 평가액
+            const itemInvOriginal = s.avgPrice * s.quantity;
+            const itemCurOriginal = s.currentPrice * s.quantity;
+            const itemPLOriginal = itemCurOriginal - itemInvOriginal;
+            
+            // 💡 총합에 더할 때는 미국 주식이면 환율을 곱해서 원화로 바꾼 뒤 더함!
+            if (isUS) {
+                totalInvKRW += (itemInvOriginal * currentExchangeRate);
+                totalCurKRW += (itemCurOriginal * currentExchangeRate);
+            } else {
+                totalInvKRW += itemInvOriginal;
+                totalCurKRW += itemCurOriginal;
+            }
+
             const pr = (((s.currentPrice - s.avgPrice) / s.avgPrice) * 100).toFixed(2);
             const color = pr > 0 ? 'var(--red)' : 'var(--blue)';
             const bg = pr > 0 ? 'rgba(244, 63, 94, 0.15)' : 'rgba(59, 130, 246, 0.15)';
             const sign = pr > 0 ? '+' : '';
 
-            const isUS = /[a-zA-Z]/.test(s.code);
-            const currSymbol = isUS ? '$' : '원';
             const priceDisp = isUS ? s.currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2}) + currSymbol : s.currentPrice.toLocaleString() + currSymbol;
             const avgDisp = isUS ? s.avgPrice.toLocaleString(undefined, {minimumFractionDigits: 2}) + currSymbol : s.avgPrice.toLocaleString() + currSymbol;
 
+            const itemCurDisp = isUS ? itemCurOriginal.toLocaleString(undefined, {minimumFractionDigits: 2}) + currSymbol : Math.floor(itemCurOriginal).toLocaleString() + currSymbol;
+            const itemPLDisp = isUS ? Math.abs(itemPLOriginal).toLocaleString(undefined, {minimumFractionDigits: 2}) + currSymbol : Math.floor(Math.abs(itemPLOriginal)).toLocaleString() + currSymbol;
+            const plSign = itemPLOriginal > 0 ? '+' : (itemPLOriginal < 0 ? '-' : '');
+
             container.innerHTML += `
                 <div class="stock-item">
-                    <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleChart(${i})">
-                        <div>
-                            <div style="font-weight:800; font-size:1.1rem; color:white;">${s.name} <span style="font-size:0.8rem; color:var(--text-sub); font-weight:normal;">▼</span></div>
-                            <div style="font-size:0.85rem; color:var(--text-sub);">평단 ${avgDisp} (x${s.quantity})</div>
+                    <div style="cursor:pointer;" onclick="toggleChart(${i})">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div style="font-weight:800; font-size:1.1rem; color:white;">${s.name} <span style="font-size:0.8rem; color:var(--text-sub); font-weight:normal;">▼</span></div>
+                                <div style="font-size:0.85rem; color:var(--text-sub);">평단 ${avgDisp} (x${s.quantity})</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-weight:800; color:${color}">${priceDisp}</div>
+                                <div style="font-size:0.85rem; font-weight:700; color:${color}; background:${bg}; padding:3px 8px; border-radius:6px; display:inline-block; margin-top:4px;">${sign}${pr}%</div>
+                            </div>
                         </div>
-                        <div style="text-align:right;">
-                            <div style="font-weight:800; color:${color}">${priceDisp}</div>
-                            <div style="font-size:0.85rem; font-weight:700; color:${color}; background:${bg}; padding:3px 8px; border-radius:6px; display:inline-block; margin-top:4px;">${sign}${pr}%</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.1); font-size: 0.9rem;">
+                            <div style="color:var(--text-sub);">평가금액: <span style="color:white; font-weight:bold;">${itemCurDisp}</span></div>
+                            <div style="color:var(--text-sub);">평가손익: <span style="color:${color}; font-weight:bold;">${plSign}${itemPLDisp}</span></div>
                         </div>
                     </div>
                     <div class="chart-dropdown" id="chart-${i}">
@@ -438,9 +501,18 @@
                 </div>`;
         });
         
-        const totalPr = (((totalCur - totalInv) / totalInv) * 100).toFixed(2);
+        // 💡 통합된 원화 기준으로 총 수익률 및 금액 표기
+        const totalPr = (((totalCurKRW - totalInvKRW) / totalInvKRW) * 100).toFixed(2);
         document.getElementById('totalYieldDisplay').innerText = `${totalPr > 0 ? '+' : ''}${totalPr}%`;
         document.getElementById('totalYieldDisplay').style.color = totalPr > 0 ? 'var(--red)' : 'var(--blue)';
+
+        const totalPLAmountKRW = totalCurKRW - totalInvKRW;
+        document.getElementById('totalInvDisplay').innerText = Math.floor(totalInvKRW).toLocaleString() + "원";
+        document.getElementById('totalPlDisplay').innerText = `${totalPLAmountKRW > 0 ? '+' : ''}${Math.floor(totalPLAmountKRW).toLocaleString()}원`;
+        document.getElementById('totalPlDisplay').style.color = totalPLAmountKRW > 0 ? 'var(--red)' : 'var(--blue)';
+        
+        // 화면 상단에 현재 적용된 환율 표시
+        document.getElementById('exRateDisplay').innerText = `(적용환율: ${currentExchangeRate.toLocaleString(undefined, {maximumFractionDigits:1})}원)`;
     }
 
     function delStock(idx) { if(confirm("삭제하시겠습니까?")) { myStocks.splice(idx, 1); localStorage.setItem('myStocks', JSON.stringify(myStocks)); renderList(); } }
