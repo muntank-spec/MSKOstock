@@ -22,7 +22,7 @@
         body { font-family: 'Pretendard', sans-serif; background: var(--bg-color); color: var(--text-main); padding: 15px; }
         .container { max-width: 600px; margin: 0 auto; }
         .header { text-align: center; margin: 20px 0; }
-        .header h1 { font-size: 1.6rem; font-weight: 800; background: linear-gradient(to right, #a5b4fc, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header h1 { font-size: 1.6rem; font-weight: 800; background: linear-gradient(to right, #a5b4fc, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 5px; }
 
         .card { background: var(--card-bg); padding: 22px; border-radius: 24px; margin-bottom: 20px; border: 1px solid var(--border); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
         .search-area { position: relative; margin-bottom: 12px; }
@@ -62,20 +62,23 @@
 </head>
 <body>
 <div class="container">
-    <div class="header"><h1>나의 주식 비서 Pro</h1><p style="color:var(--text-sub); font-size:0.85rem; margin-top:-15px;">🇰🇷 국내 & 🇺🇸 미국 통합 포트폴리오</p></div>
+    <div class="header">
+        <h1>나의 주식 비서 Pro</h1>
+        <p style="color:var(--text-sub); font-size:0.85rem; margin-top: 5px;">🇰🇷 국내 & 🇺🇸 미국 통합 포트폴리오</p>
+    </div>
 
     <div class="card">
         <div style="font-weight: 800; margin-bottom: 15px; font-size: 1.1rem;">📝 종목 검색 및 추가</div>
         
         <div class="search-area">
-            <input type="text" id="sName" placeholder="🔍 종목명 (예: 삼성전자, 테슬라, QQQ)" oninput="searchLocalStock(this.value)" autocomplete="off">
+            <input type="text" id="sName" placeholder="🔍 TIGER, 삼성, TSLA 등 검색" oninput="searchLocalStock(this.value)" autocomplete="off">
             <div id="autocompleteList"></div>
         </div>
         <div class="search-area">
-            <input type="text" id="sCode" placeholder="종목코드 (검색시 자동입력, 예: 005930, TSLA)">
+            <input type="text" id="sCode" placeholder="종목코드 (검색시 자동입력)">
         </div>
         <div class="input-grid">
-            <input type="number" id="sAvg" placeholder="평단가 (원 또는 달러)">
+            <input type="number" id="sAvg" placeholder="평단가 (원/달러)">
             <input type="number" id="sQty" placeholder="보유 수량">
         </div>
         
@@ -128,28 +131,76 @@
     let myStocks = JSON.parse(localStorage.getItem('myStocks')) || [];
     let curIdx = -1;
 
-    // 🚀 한국 & 미국 주식 통합 내장 DB
+    // 🚀 한국주식 + 미국주식 + 국내 상장 ETF 완벽 통합 DB
     const localStockDB = [
-        // 한국 대형주
-        { name: "삼성전자", code: "005930" }, { name: "SK하이닉스", code: "000660" },
-        { name: "LG에너지솔루션", code: "373220" }, { name: "삼성바이오로직스", code: "207940" },
-        { name: "현대차", code: "005380" }, { name: "기아", code: "000270" },
-        { name: "셀트리온", code: "068270" }, { name: "POSCO홀딩스", code: "005490" },
-        { name: "NAVER", code: "035420" }, { name: "카카오", code: "035720" },
+        { name: "TIGER 미국나스닥100", code: "133690" },
+        { name: "TIGER 미국S&P500", code: "360750" },
+        { name: "TIGER 미국배당다우존스", code: "458730" },
+        { name: "TIGER 미국테크TOP10 INDXX", code: "381170" },
+        { name: "TIGER 미국필라델피아반도체나스닥", code: "381180" },
+        { name: "TIGER 글로벌리튬&2차전지SOLACTIVE", code: "394640" },
+        { name: "TIGER 미국나스닥100커버드콜(합성)", code: "441680" },
+        { name: "TIGER 인도니프티50", code: "453870" },
+        { name: "TIGER 2차전지테마", code: "305540" },
+        { name: "KODEX 200", code: "069500" },
+        { name: "KODEX 레버리지", code: "122630" },
+        { name: "KODEX 200선물인버스2X (곱버스)", code: "252670" },
+        { name: "KODEX 코스닥150레버리지", code: "233740" },
+        { name: "KODEX 코스닥150선물인버스", code: "251340" },
+        { name: "KODEX 2차전지산업", code: "305720" },
+        { name: "KODEX 미국나스닥100TR", code: "379800" },
+        { name: "KODEX 미국S&P500TR", code: "379810" },
+        { name: "KODEX 미국배당다우존스", code: "482060" },
+        { name: "ACE 미국나스닥100", code: "367380" },
+        { name: "ACE 미국S&P500", code: "360200" },
+        { name: "ACE 글로벌반도체TOP4 Plus SOLACTIVE", code: "431310" },
+        { name: "SOL 미국배당다우존스", code: "446720" },
+        { name: "SOL 미국S&P500", code: "433330" },
+        { name: "삼성전자", code: "005930" }, { name: "삼성전자우", code: "005935" },
+        { name: "SK하이닉스", code: "000660" }, { name: "LG에너지솔루션", code: "373220" },
+        { name: "삼성바이오로직스", code: "207940" }, { name: "현대차", code: "005380" },
+        { name: "기아", code: "000270" }, { name: "셀트리온", code: "068270" },
+        { name: "POSCO홀딩스", code: "005490" }, { name: "NAVER", code: "035420" },
+        { name: "카카오", code: "035720" }, { name: "삼성SDI", code: "006400" },
+        { name: "LG화학", code: "051910" }, { name: "삼성물산", code: "028260" },
+        { name: "KB금융", code: "105560" }, { name: "신한지주", code: "055550" },
+        { name: "하나금융지주", code: "086790" }, { name: "메리츠금융지주", code: "138040" },
+        { name: "카카오뱅크", code: "323410" }, { name: "카카오페이", code: "377300" },
+        { name: "HD현대중공업", code: "329180" }, { name: "한화에어로스페이스", code: "012450" },
+        { name: "현대로템", code: "064350" }, { name: "LIG넥스원", code: "079550" },
+        { name: "두산에너빌리티", code: "034020" }, { name: "한국전력", code: "015760" },
         { name: "에코프로비엠", code: "247540" }, { name: "에코프로", code: "086520" },
-        { name: "SAMG엔터", code: "419530" }, // 문성님 관심 종목
-        // 미국 대형주 (차트를 위해 거래소명 NAS@, NYS@ 등을 앞에 붙여둡니다)
+        { name: "에코프로머티", code: "450080" }, { name: "포스코퓨처엠", code: "003670" },
+        { name: "엔켐", code: "348370" }, { name: "알테오젠", code: "196170" },
+        { name: "HLB", code: "028300" }, { name: "리노공업", code: "058470" },
+        { name: "HPSP", code: "403870" }, { name: "클래시스", code: "214150" },
+        { name: "휴젤", code: "145020" }, { name: "삼천당제약", code: "000250" },
+        { name: "실리콘투", code: "257720" }, { name: "크래프톤", code: "259960" },
+        { name: "엔씨소프트", code: "036570" }, { name: "하이브", code: "352820" },
+        { name: "JYP Ent.", code: "035900" }, { name: "SAMG엔터", code: "419530" },
         { name: "애플 (AAPL)", code: "NAS@AAPL" }, { name: "테슬라 (TSLA)", code: "NAS@TSLA" },
         { name: "엔비디아 (NVDA)", code: "NAS@NVDA" }, { name: "마이크로소프트 (MSFT)", code: "NAS@MSFT" },
-        { name: "알파벳 A (GOOGL)", code: "NAS@GOOGL" }, { name: "아마존 (AMZN)", code: "NAS@AMZN" },
-        { name: "메타 (META)", code: "NAS@META" }, { name: "브로드컴 (AVGO)", code: "NAS@AVGO" },
-        { name: "AMD", code: "NAS@AMD" }, { name: "TSMC (TSM)", code: "NYS@TSM" },
-        { name: "일라이 릴리 (LLY)", code: "NYS@LLY" }, { name: "팔란티어 (PLTR)", code: "NYS@PLTR" },
-        { name: "리얼티 인컴 (O)", code: "NYS@O" }, { name: "코인베이스 (COIN)", code: "NAS@COIN" },
-        { name: "아이온큐 (IONQ)", code: "NYS@IONQ" }, { name: "마이크로스트레티지 (MSTR)", code: "NAS@MSTR" },
-        // 미국 핵심 ETF
-        { name: "SPY (S&P 500)", code: "NYS@SPY" }, { name: "QQQ (나스닥 100)", code: "NAS@QQQ" },
-        { name: "SCHD (배당성장)", code: "NYS@SCHD" }, { name: "SOXX (반도체)", code: "NAS@SOXX" }
+        { name: "알파벳 A (GOOGL)", code: "NAS@GOOGL" }, { name: "알파벳 C (GOOG)", code: "NAS@GOOG" },
+        { name: "아마존 (AMZN)", code: "NAS@AMZN" }, { name: "메타 (META)", code: "NAS@META" },
+        { name: "브로드컴 (AVGO)", code: "NAS@AVGO" }, { name: "AMD", code: "NAS@AMD" },
+        { name: "TSMC (TSM)", code: "NYS@TSM" }, { name: "ASML", code: "NAS@ASML" },
+        { name: "인텔 (INTC)", code: "NAS@INTC" }, { name: "퀄컴 (QCOM)", code: "NAS@QCOM" },
+        { name: "마이크론 (MU)", code: "NAS@MU" }, { name: "ARM", code: "NAS@ARM" },
+        { name: "일라이 릴리 (LLY)", code: "NYS@LLY" }, { name: "노보 노디스크 (NVO)", code: "NYS@NVO" },
+        { name: "월마트 (WMT)", code: "NYS@WMT" }, { name: "코스트코 (COST)", code: "NAS@COST" },
+        { name: "넷플릭스 (NFLX)", code: "NAS@NFLX" }, { name: "디즈니 (DIS)", code: "NYS@DIS" },
+        { name: "팔란티어 (PLTR)", code: "NYS@PLTR" }, { name: "우버 (UBER)", code: "NYS@UBER" },
+        { name: "로블록스 (RBLX)", code: "NYS@RBLX" }, { name: "유니티 (U)", code: "NYS@U" },
+        { name: "소파이 (SOFI)", code: "NAS@SOFI" }, { name: "로빈후드 (HOOD)", code: "NAS@HOOD" },
+        { name: "코인베이스 (COIN)", code: "NAS@COIN" }, { name: "마이크로스트레티지 (MSTR)", code: "NAS@MSTR" },
+        { name: "아이온큐 (IONQ)", code: "NYS@IONQ" }, { name: "리얼티 인컴 (O)", code: "NYS@O" },
+        { name: "SPY (S&P 500)", code: "NYS@SPY" }, { name: "VOO (S&P 500)", code: "NYS@VOO" },
+        { name: "IVV (S&P 500)", code: "NYS@IVV" }, { name: "QQQ (나스닥 100)", code: "NAS@QQQ" },
+        { name: "TQQQ (나스닥 3배)", code: "NAS@TQQQ" }, { name: "SQQQ (나스닥 인버스 3배)", code: "NAS@SQQQ" },
+        { name: "SOXX (반도체)", code: "NAS@SOXX" }, { name: "SOXL (반도체 3배)", code: "NYS@SOXL" },
+        { name: "SCHD (배당성장)", code: "NYS@SCHD" }, { name: "JEPI (커버드콜)", code: "NYS@JEPI" },
+        { name: "JEPQ (나스닥 커버드콜)", code: "NAS@JEPQ" }, { name: "TLT (20년 장기채)", code: "NAS@TLT" },
+        { name: "ARKK (혁신기업 액티브)", code: "NYS@ARKK" }
     ];
 
     window.onload = renderList;
@@ -165,7 +216,6 @@
 
         if (results.length > 0) {
             list.innerHTML = results.map(item => {
-                // 화면 표시용 (NAS@TSLA -> TSLA 로 보여줌)
                 const displayCode = item.code.includes('@') ? item.code.split('@')[1] : item.code;
                 return `<div class="autocomplete-item" onclick="selectStock('${item.name}', '${item.code}')">
                             <span style="font-weight:700; color:white;">${item.name}</span>
@@ -212,7 +262,6 @@
 
         let currentPrice = 0;
         
-        // 💡 미국 주식 구분 로직
         const ticker = codeInput.includes('@') ? codeInput.split('@')[1] : codeInput;
         const isUS = /[A-Z]/.test(ticker); 
 
@@ -223,7 +272,6 @@
                 const priceStr = data.contents ? JSON.parse(data.contents).closePrice : data.closePrice;
                 currentPrice = parseInt(priceStr.replace(/,/g, ''));
             } else {
-                // 미국 주식은 야후 파이낸스에서 소수점까지 가져옴
                 const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`;
                 const data = await fetchWithFallback(url);
                 const json = data.contents ? JSON.parse(data.contents) : data;
@@ -273,14 +321,12 @@
         document.getElementById('refreshBtn').innerText = "🔄 갱신";
     }
 
-    // 💡 차트 분기 로직 (한국은 국내 차트, 미국은 해외 차트)
     function getChartUrl(code, period = 'day') {
         const ts = Date.now();
         const isUS = /[a-zA-Z]/.test(code);
         if (!isUS) {
             return `https://ssl.pstatic.net/imgfinance/chart/item/candle/${period}/${code}.png?${ts}`;
         } else {
-            // DB에 없는 미국주식을 수동으로 쳤을 경우 기본값 NAS@ 적용
             let chartCode = code.includes('@') ? code : `NAS@${code.toUpperCase()}`;
             return `https://ssl.pstatic.net/imgfinance/chart/world/candle/${period}/${chartCode}.png?${ts}`;
         }
@@ -307,7 +353,6 @@
             const bg = pr > 0 ? 'rgba(244, 63, 94, 0.15)' : 'rgba(59, 130, 246, 0.15)';
             const sign = pr > 0 ? '+' : '';
 
-            // 💡 통화 기호 분기 (영어 포함 시 달러, 아니면 원)
             const isUS = /[a-zA-Z]/.test(s.code);
             const currSymbol = isUS ? '$' : '원';
             const priceDisp = isUS ? s.currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2}) + currSymbol : s.currentPrice.toLocaleString() + currSymbol;
@@ -354,7 +399,6 @@
         document.getElementById('aTitle').innerText = s.name;
         document.getElementById('aSubtitle').innerText = `수익률: ${(((s.currentPrice-s.avgPrice)/s.avgPrice)*100).toFixed(2)}%`;
         
-        // 💡 수정 모달창에서 NAS@ 같은 코드는 빼고 보여주기
         document.getElementById('uCode').value = s.code.includes('@') ? s.code.split('@')[1] : s.code; 
         document.getElementById('uPrice').value = s.currentPrice;
         document.getElementById('overlay').style.display = 'block'; document.getElementById('aModal').style.display = 'block';
@@ -362,7 +406,6 @@
 
     function updatePrice() {
         const uCode = document.getElementById('uCode').value.toUpperCase();
-        // 미국 주식이면 기존 거래소 코드 유지
         if(/[A-Z]/.test(uCode) && !uCode.includes('@')) {
             myStocks[curIdx].code = `NAS@${uCode}`;
         } else {
