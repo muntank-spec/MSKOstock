@@ -68,24 +68,6 @@
     </div>
 
     <div class="card">
-        <div style="font-weight: 800; margin-bottom: 15px; font-size: 1.1rem;">📝 종목 검색 및 추가</div>
-        
-        <div class="search-area">
-            <input type="text" id="sName" placeholder="🔍 TIGER, 삼성, TSLA 등 검색 (또는 비워두기)" oninput="searchLocalStock(this.value)" autocomplete="off">
-            <div id="autocompleteList"></div>
-        </div>
-        <div class="search-area">
-            <input type="text" id="sCode" placeholder="종목코드 (필수! 이름 비워도 알아서 찾음)">
-        </div>
-        <div class="input-grid">
-            <input type="number" id="sAvg" placeholder="평단가 (원/달러)">
-            <input type="number" id="sQty" placeholder="보유 수량">
-        </div>
-        
-        <button class="btn-main" onclick="addStock()" id="addBtn">포트폴리오에 저장</button>
-    </div>
-
-    <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span style="font-weight: 800; font-size: 1.1rem;">💼 포트폴리오</span>
@@ -107,22 +89,48 @@
 
         <div id="stockListContainer"></div>
     </div>
+
+    <div class="card">
+        <div style="font-weight: 800; margin-bottom: 15px; font-size: 1.1rem;">📝 새로운 종목 추가</div>
+        
+        <div class="search-area">
+            <input type="text" id="sName" placeholder="🔍 TIGER, 삼성, TSLA 등 검색 (또는 비워두기)" oninput="searchLocalStock(this.value)" autocomplete="off">
+            <div id="autocompleteList"></div>
+        </div>
+        <div class="search-area">
+            <input type="text" id="sCode" placeholder="종목코드 (필수! 이름 비워도 알아서 찾음)">
+        </div>
+        <div class="input-grid">
+            <input type="number" id="sAvg" placeholder="평단가 (원/달러)">
+            <input type="number" id="sQty" placeholder="보유 수량">
+        </div>
+        
+        <button class="btn-main" onclick="addStock()" id="addBtn">포트폴리오에 저장</button>
+    </div>
 </div>
 
 <div class="modal-overlay" id="overlay" onclick="closeModals()"></div>
+
 <div class="modal" id="aModal">
-    <h3 id="aTitle" style="color:white; margin-bottom:5px;">진단</h3>
+    <h3 id="aTitle" style="color:white; margin-bottom:5px;">진단 및 정보 수정</h3>
     <div id="aSubtitle" style="color:var(--text-sub); font-size: 0.85rem; margin-bottom: 20px;"></div>
-    <div id="aContent" style="color:#cbd5e1; line-height:1.6; margin-bottom:20px;"></div>
     
     <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:10px; margin-bottom:20px; border: 1px solid var(--border);">
-        <label style="font-size:0.85rem; color:var(--text-sub); font-weight: bold; margin-bottom: 8px; display: block;">수동 데이터 수정</label>
+        <label style="font-size:0.85rem; color:var(--text-sub); font-weight: bold; margin-bottom: 8px; display: block;">수동 데이터 수정 (추가 매수 시 업데이트)</label>
+        
         <input type="text" id="uCode" placeholder="종목코드" style="margin-bottom:8px;">
+        
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <input type="number" id="uAvg" placeholder="내 평단가" style="flex: 1;">
+            <input type="number" id="uQty" placeholder="보유 수량" style="flex: 1;">
+        </div>
+        
         <div style="display: flex; gap: 8px;">
             <input type="number" id="uPrice" placeholder="현재가" style="flex: 1;">
             <button onclick="updatePrice()" style="padding: 0 20px; background: var(--primary); color: white; border-radius: 12px; border:none; font-weight:bold;">저장</button>
         </div>
     </div>
+    
     <button onclick="askGemini()" class="btn-main" style="margin-bottom: 10px;">✨ AI 정밀 진단 복사</button>
     <button onclick="closeModals()" style="width:100%; padding:14px; background:transparent; border:none; color:var(--text-sub); font-weight:bold;">닫기</button>
 </div>
@@ -142,7 +150,7 @@
 <script>
     let myStocks = JSON.parse(localStorage.getItem('myStocks')) || [];
     let curIdx = -1;
-    let currentExchangeRate = 1330; // 💡 기본 환율 세팅 (오류 대비용)
+    let currentExchangeRate = 1330;
 
     const localStockDB = [
         { name: "TIME 미국나스닥100액티브", code: "426030" },
@@ -270,7 +278,6 @@
         throw new Error("차단됨");
     }
 
-    // 💡 실시간 원/달러 환율 불러오는 함수 추가
     async function updateExchangeRate() {
         try {
             const url = `https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1d&range=1d`;
@@ -316,7 +323,7 @@
         const btn = document.getElementById('refreshBtn');
         btn.innerText = "⏳ 갱신중";
         
-        await updateExchangeRate(); // 💡 환율 먼저 최신화
+        await updateExchangeRate(); 
         
         let isUpdated = false;
         for (let i = 0; i < myStocks.length; i++) {
@@ -332,7 +339,7 @@
         if(isUpdated) {
             localStorage.setItem('myStocks', JSON.stringify(myStocks));
         }
-        renderList(); // 환율이 반영되도록 새로 고침
+        renderList(); 
         btn.innerText = "🔄 갱신";
     }
 
@@ -387,7 +394,7 @@
         if(myStocks.length === 0) return;
         document.getElementById('refreshBtn').innerText = "⏳";
         
-        await updateExchangeRate(); // 💡 갱신 시 환율도 다시 불러옴
+        await updateExchangeRate(); 
         
         for (let i = 0; i < myStocks.length; i++) {
             try {
@@ -434,19 +441,16 @@
             return; 
         }
         
-        // 💡 총액은 오직 '원화(KRW)' 기준으로만 합산하기 위한 변수
         let totalInvKRW = 0, totalCurKRW = 0;
         
         myStocks.forEach((s, i) => {
             const isUS = /[a-zA-Z]/.test(s.code);
             const currSymbol = isUS ? '$' : '원';
             
-            // 각 주식의 고유 통화 기준 투자금과 평가액
             const itemInvOriginal = s.avgPrice * s.quantity;
             const itemCurOriginal = s.currentPrice * s.quantity;
             const itemPLOriginal = itemCurOriginal - itemInvOriginal;
             
-            // 💡 총합에 더할 때는 미국 주식이면 환율을 곱해서 원화로 바꾼 뒤 더함!
             if (isUS) {
                 totalInvKRW += (itemInvOriginal * currentExchangeRate);
                 totalCurKRW += (itemCurOriginal * currentExchangeRate);
@@ -501,7 +505,6 @@
                 </div>`;
         });
         
-        // 💡 통합된 원화 기준으로 총 수익률 및 금액 표기
         const totalPr = (((totalCurKRW - totalInvKRW) / totalInvKRW) * 100).toFixed(2);
         document.getElementById('totalYieldDisplay').innerText = `${totalPr > 0 ? '+' : ''}${totalPr}%`;
         document.getElementById('totalYieldDisplay').style.color = totalPr > 0 ? 'var(--red)' : 'var(--blue)';
@@ -511,23 +514,27 @@
         document.getElementById('totalPlDisplay').innerText = `${totalPLAmountKRW > 0 ? '+' : ''}${Math.floor(totalPLAmountKRW).toLocaleString()}원`;
         document.getElementById('totalPlDisplay').style.color = totalPLAmountKRW > 0 ? 'var(--red)' : 'var(--blue)';
         
-        // 화면 상단에 현재 적용된 환율 표시
         document.getElementById('exRateDisplay').innerText = `(적용환율: ${currentExchangeRate.toLocaleString(undefined, {maximumFractionDigits:1})}원)`;
     }
 
     function delStock(idx) { if(confirm("삭제하시겠습니까?")) { myStocks.splice(idx, 1); localStorage.setItem('myStocks', JSON.stringify(myStocks)); renderList(); } }
     function closeModals() { document.querySelectorAll('.modal, .modal-overlay').forEach(m => m.style.display = 'none'); }
 
+    // 💡 수정 모달 열 때 평단가, 수량도 기존 데이터로 채워줌
     function openA(i) {
         curIdx = i; const s = myStocks[i];
         document.getElementById('aTitle').innerText = s.name;
         document.getElementById('aSubtitle').innerText = `수익률: ${(((s.currentPrice-s.avgPrice)/s.avgPrice)*100).toFixed(2)}%`;
         
         document.getElementById('uCode').value = s.code.includes('@') ? s.code.split('@')[1] : s.code; 
+        document.getElementById('uAvg').value = s.avgPrice; // 평단가 입력란
+        document.getElementById('uQty').value = s.quantity; // 수량 입력란
         document.getElementById('uPrice').value = s.currentPrice;
+        
         document.getElementById('overlay').style.display = 'block'; document.getElementById('aModal').style.display = 'block';
     }
 
+    // 💡 저장 버튼 누르면 평단가, 수량도 덮어쓰기 적용
     function updatePrice() {
         const uCode = document.getElementById('uCode').value.toUpperCase();
         if(/[A-Z]/.test(uCode) && !uCode.includes('@')) {
@@ -535,8 +542,15 @@
         } else {
             myStocks[curIdx].code = uCode;
         }
-        myStocks[curIdx].currentPrice = parseFloat(document.getElementById('uPrice').value);
-        localStorage.setItem('myStocks', JSON.stringify(myStocks)); renderList(); closeModals();
+        
+        // 입력값이 비어있지 않으면 새 값으로, 비어있으면 기존 값으로 유지
+        myStocks[curIdx].avgPrice = parseFloat(document.getElementById('uAvg').value) || myStocks[curIdx].avgPrice;
+        myStocks[curIdx].quantity = parseFloat(document.getElementById('uQty').value) || myStocks[curIdx].quantity;
+        myStocks[curIdx].currentPrice = parseFloat(document.getElementById('uPrice').value) || myStocks[curIdx].currentPrice;
+        
+        localStorage.setItem('myStocks', JSON.stringify(myStocks)); 
+        renderList(); 
+        closeModals();
     }
 
     function askGemini() {
