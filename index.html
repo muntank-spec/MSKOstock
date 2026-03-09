@@ -203,7 +203,11 @@
         { name: "ARKK (혁신기업 액티브)", code: "NYS@ARKK" }
     ];
 
-    window.onload = renderList;
+    // 💡 앱 실행 시 화면을 그리고, 즉시 전체 가격 자동 갱신 실행!
+    window.onload = () => {
+        renderList();
+        updateAllPricesOnLoad();
+    };
 
     function searchLocalStock(query) {
         const list = document.getElementById('autocompleteList');
@@ -234,18 +238,65 @@
         document.getElementById('autocompleteList').style.display = 'none';
     }
 
+    // 💡 강력해진 3중 우회 프록시 통신 (캐시 방지 적용)
     async function fetchWithFallback(targetUrl) {
         const proxies = [
-            `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
+            `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
         ];
         for (let proxy of proxies) {
             try {
-                const res = await fetch(proxy);
-                if (res.ok) return JSON.parse(await res.text());
-            } catch (e) {}
+                const res = await fetch(proxy, { cache: 'no-cache' });
+                if (res.ok) {
+                    const text = await res.text();
+                    return JSON.parse(text);
+                }
+            } catch (e) { console.log("프록시 실패:", proxy); }
         }
         throw new Error("차단됨");
+    }
+
+    // 💡 국내/해외 통합 실시간 가격 조회 로직 (코드 중복 방지 및 야후 v7 API 적용)
+    async function getRealTimePrice(code) {
+        const ticker = code.includes('@') ? code.split('@')[1] : code;
+        const isUS = /[A-Z]/.test(ticker);
+
+        if (!isUS) {
+            const url = `https://m.stock.naver.com/api/stock/${ticker}/basic`;
+            const data = await fetchWithFallback(url);
+            const priceStr = data.contents ? JSON.parse(data.contents).closePrice : data.closePrice;
+            return parseInt(priceStr.replace(/,/g, ''));
+        } else {
+            const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}`;
+            const data = await fetchWithFallback(url);
+            const json = data.contents ? JSON.parse(data.contents) : data;
+            return parseFloat(json.quoteResponse.result[0].regularMarketPrice.toFixed(2));
+        }
+    }
+
+    // 💡 앱 켤 때 백그라운드에서 자동으로 기존 종목 가격 갱신하는 함수
+    async function updateAllPricesOnLoad() {
+        if(myStocks.length === 0) return;
+        const btn = document.getElementById('refreshBtn');
+        btn.innerText = "⏳ 갱신중";
+        
+        let isUpdated = false;
+        for (let i = 0; i < myStocks.length; i++) {
+            try {
+                const newPrice = await getRealTimePrice(myStocks[i].code);
+                if(newPrice && newPrice !== myStocks[i].currentPrice) {
+                    myStocks[i].currentPrice = newPrice;
+                    isUpdated = true;
+                }
+            } catch(e) { console.log("자동 갱신 실패:", myStocks[i].name); }
+        }
+        
+        if(isUpdated) {
+            localStorage.setItem('myStocks', JSON.stringify(myStocks));
+            renderList();
+        }
+        btn.innerText = "🔄 갱신";
     }
 
     async function addStock() {
@@ -261,22 +312,12 @@
         btn.disabled = true;
 
         let currentPrice = 0;
-        
         const ticker = codeInput.includes('@') ? codeInput.split('@')[1] : codeInput;
         const isUS = /[A-Z]/.test(ticker); 
 
         try {
-            if (!isUS) {
-                const url = `https://m.stock.naver.com/api/stock/${ticker}/basic`;
-                const data = await fetchWithFallback(url);
-                const priceStr = data.contents ? JSON.parse(data.contents).closePrice : data.closePrice;
-                currentPrice = parseInt(priceStr.replace(/,/g, ''));
-            } else {
-                const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`;
-                const data = await fetchWithFallback(url);
-                const json = data.contents ? JSON.parse(data.contents) : data;
-                currentPrice = parseFloat(json.chart.result[0].meta.regularMarketPrice.toFixed(2));
-            }
+            // 💡 깔끔해진 가격 조회 로직 호출
+            currentPrice = await getRealTimePrice(codeInput);
         } catch (e) {
             const currSymbol = isUS ? '달러($)' : '원';
             const manualPrice = prompt(`방화벽으로 인해 가격을 불러오지 못했습니다.\n'${name}'의 현재가를 ${currSymbol} 단위로 직접 적어주세요!`);
@@ -300,20 +341,8 @@
         document.getElementById('refreshBtn').innerText = "⏳";
         
         for (let i = 0; i < myStocks.length; i++) {
-            const code = myStocks[i].code;
-            const ticker = code.includes('@') ? code.split('@')[1] : code;
-            const isUS = /[A-Z]/.test(ticker);
-
             try {
-                if (!isUS) {
-                    const data = await fetchWithFallback(`https://m.stock.naver.com/api/stock/${ticker}/basic`);
-                    const priceStr = data.contents ? JSON.parse(data.contents).closePrice : data.closePrice;
-                    myStocks[i].currentPrice = parseInt(priceStr.replace(/,/g, ''));
-                } else {
-                    const data = await fetchWithFallback(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}`);
-                    const json = data.contents ? JSON.parse(data.contents) : data;
-                    myStocks[i].currentPrice = parseFloat(json.chart.result[0].meta.regularMarketPrice.toFixed(2));
-                }
+                myStocks[i].currentPrice = await getRealTimePrice(myStocks[i].code);
             } catch(e) {}
         }
         localStorage.setItem('myStocks', JSON.stringify(myStocks));
