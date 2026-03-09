@@ -71,11 +71,11 @@
         <div style="font-weight: 800; margin-bottom: 15px; font-size: 1.1rem;">📝 종목 검색 및 추가</div>
         
         <div class="search-area">
-            <input type="text" id="sName" placeholder="🔍 TIGER, 삼성, TSLA 등 검색" oninput="searchLocalStock(this.value)" autocomplete="off">
+            <input type="text" id="sName" placeholder="🔍 TIGER, 삼성, TSLA 등 검색 (또는 비워두기)" oninput="searchLocalStock(this.value)" autocomplete="off">
             <div id="autocompleteList"></div>
         </div>
         <div class="search-area">
-            <input type="text" id="sCode" placeholder="종목코드 (검색시 자동입력)">
+            <input type="text" id="sCode" placeholder="종목코드 (필수! 이름 비워도 알아서 찾음)">
         </div>
         <div class="input-grid">
             <input type="number" id="sAvg" placeholder="평단가 (원/달러)">
@@ -133,6 +133,9 @@
 
     // 🚀 한국주식 + 미국주식 + 국내 상장 ETF 완벽 통합 DB
     const localStockDB = [
+        { name: "TIME 미국나스닥100액티브", code: "426030" },
+        { name: "TIME 미국S&P500액티브", code: "426020" },
+        { name: "TIME 글로벌AI인공지능액티브", code: "456600" },
         { name: "TIGER 미국나스닥100", code: "133690" },
         { name: "TIGER 미국S&P500", code: "360750" },
         { name: "TIGER 미국배당다우존스", code: "458730" },
@@ -203,7 +206,6 @@
         { name: "ARKK (혁신기업 액티브)", code: "NYS@ARKK" }
     ];
 
-    // 💡 앱 실행 시 화면을 그리고, 즉시 전체 가격 자동 갱신 실행!
     window.onload = () => {
         renderList();
         updateAllPricesOnLoad();
@@ -227,7 +229,7 @@
                         </div>`
             }).join('');
         } else {
-            list.innerHTML = `<div class="search-status">목록에 없습니다.<br>종목명과 코드(영문/숫자)를 직접 적어주세요.</div>`;
+            list.innerHTML = `<div class="search-status">목록에 없습니다.<br>종목코드(숫자 또는 영어)를 직접 적어주세요.</div>`;
         }
         list.style.display = 'block';
     }
@@ -238,7 +240,6 @@
         document.getElementById('autocompleteList').style.display = 'none';
     }
 
-    // 💡 강력해진 3중 우회 프록시 통신 (캐시 방지 적용)
     async function fetchWithFallback(targetUrl) {
         const proxies = [
             `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
@@ -257,25 +258,31 @@
         throw new Error("차단됨");
     }
 
-    // 💡 국내/해외 통합 실시간 가격 조회 로직 (코드 중복 방지 및 야후 v7 API 적용)
-    async function getRealTimePrice(code) {
+    // 💡 가격뿐만 아니라 '종목명'까지 같이 가져오도록 업그레이드!
+    async function getRealTimeData(code) {
         const ticker = code.includes('@') ? code.split('@')[1] : code;
         const isUS = /[A-Z]/.test(ticker);
 
         if (!isUS) {
             const url = `https://m.stock.naver.com/api/stock/${ticker}/basic`;
             const data = await fetchWithFallback(url);
-            const priceStr = data.contents ? JSON.parse(data.contents).closePrice : data.closePrice;
-            return parseInt(priceStr.replace(/,/g, ''));
+            const parsed = data.contents ? JSON.parse(data.contents) : data;
+            return {
+                price: parseInt(parsed.closePrice.replace(/,/g, '')),
+                name: parsed.stockName || ticker // 서버에서 공식 이름 가져오기
+            };
         } else {
             const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}`;
             const data = await fetchWithFallback(url);
-            const json = data.contents ? JSON.parse(data.contents) : data;
-            return parseFloat(json.quoteResponse.result[0].regularMarketPrice.toFixed(2));
+            const parsed = data.contents ? JSON.parse(data.contents) : data;
+            const result = parsed.quoteResponse.result[0];
+            return {
+                price: parseFloat(result.regularMarketPrice.toFixed(2)),
+                name: result.shortName || result.longName || ticker // 서버에서 공식 이름 가져오기
+            };
         }
     }
 
-    // 💡 앱 켤 때 백그라운드에서 자동으로 기존 종목 가격 갱신하는 함수
     async function updateAllPricesOnLoad() {
         if(myStocks.length === 0) return;
         const btn = document.getElementById('refreshBtn');
@@ -284,9 +291,9 @@
         let isUpdated = false;
         for (let i = 0; i < myStocks.length; i++) {
             try {
-                const newPrice = await getRealTimePrice(myStocks[i].code);
-                if(newPrice && newPrice !== myStocks[i].currentPrice) {
-                    myStocks[i].currentPrice = newPrice;
+                const stockData = await getRealTimeData(myStocks[i].code);
+                if(stockData && stockData.price !== myStocks[i].currentPrice) {
+                    myStocks[i].currentPrice = stockData.price;
                     isUpdated = true;
                 }
             } catch(e) { console.log("자동 갱신 실패:", myStocks[i].name); }
@@ -299,16 +306,24 @@
         btn.innerText = "🔄 갱신";
     }
 
+    // 💡 이름이 빈칸이어도 에러 없이 처리하도록 수정됨
     async function addStock() {
-        const name = document.getElementById('sName').value.trim();
-        const codeInput = document.getElementById('sCode').value.trim().toUpperCase(); 
+        let name = document.getElementById('sName').value.trim();
+        let codeInput = document.getElementById('sCode').value.trim().toUpperCase(); 
         const avg = parseFloat(document.getElementById('sAvg').value);
         const qty = parseFloat(document.getElementById('sQty').value) || 1;
 
-        if(!name || !codeInput || isNaN(avg)) return alert("종목명, 코드, 평단가를 모두 적어주세요!");
+        // 이름, 코드 둘 다 없으면 막기
+        if(!name && !codeInput) return alert("종목명이나 종목코드 중 하나는 꼭 적어주세요!");
+        if(isNaN(avg)) return alert("평단가를 적어주세요!");
+
+        // 코드가 없고 이름만 영어로 쳤을 경우, 이름을 코드로 대신 사용 시도
+        if(!codeInput && name) {
+            codeInput = name; 
+        }
 
         const btn = document.getElementById('addBtn');
-        btn.innerText = "가격 확인 중...";
+        btn.innerText = "정보 확인 중...";
         btn.disabled = true;
 
         let currentPrice = 0;
@@ -316,9 +331,16 @@
         const isUS = /[A-Z]/.test(ticker); 
 
         try {
-            // 💡 깔끔해진 가격 조회 로직 호출
-            currentPrice = await getRealTimePrice(codeInput);
+            // 서버에서 가격과 이름을 동시에 받아옴!
+            const stockData = await getRealTimeData(codeInput);
+            currentPrice = stockData.price;
+            
+            // 사용자가 이름을 안 적었으면 서버에서 받아온 공식 이름으로 채워줌
+            if(!name || name === codeInput) {
+                name = stockData.name;
+            }
         } catch (e) {
+            if(!name) name = codeInput; // 에러 났는데 이름도 안 쳤으면 일단 코드를 이름으로 표시
             const currSymbol = isUS ? '달러($)' : '원';
             const manualPrice = prompt(`방화벽으로 인해 가격을 불러오지 못했습니다.\n'${name}'의 현재가를 ${currSymbol} 단위로 직접 적어주세요!`);
             if(manualPrice) currentPrice = parseFloat(manualPrice.replace(/,/g, ''));
@@ -342,7 +364,8 @@
         
         for (let i = 0; i < myStocks.length; i++) {
             try {
-                myStocks[i].currentPrice = await getRealTimePrice(myStocks[i].code);
+                const stockData = await getRealTimeData(myStocks[i].code);
+                myStocks[i].currentPrice = stockData.price;
             } catch(e) {}
         }
         localStorage.setItem('myStocks', JSON.stringify(myStocks));
