@@ -3,15 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>문성님의 스마트 주식 비서 Final</title>
+    <title>문성님의 스마트 주식 비서</title>
+
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="주식비서 Pro">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#0b0f19">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2933/2933116.png">
+
     <style>
+        /* 🎨 초고급 다크 UI */
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         :root { 
             --bg-color: #0b0f19; --card-bg: #151b2b; --primary: #4f46e5; --border: #262f45; 
-            --text-main: #f8fafc; --text-sub: #94a3b8; --red: #f43f5e; --blue: #3b82f6;
+            --text-main: #f8fafc; --text-sub: #94a3b8; --red: #f43f5e; --blue: #3b82f6; --green: #10b981;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
         body { font-family: 'Pretendard', sans-serif; background: var(--bg-color); color: var(--text-main); padding: 15px; }
@@ -19,132 +25,327 @@
         .header { text-align: center; margin: 20px 0; }
         .header h1 { font-size: 1.6rem; font-weight: 800; background: linear-gradient(to right, #a5b4fc, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
+        /* 입력 폼 */
         .card { background: var(--card-bg); padding: 22px; border-radius: 24px; margin-bottom: 20px; border: 1px solid var(--border); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
         .search-area { position: relative; margin-bottom: 12px; }
-        input { width: 100%; background: #1e2536; border: 1px solid var(--border); color: white; padding: 16px; border-radius: 14px; font-size: 1rem; outline: none; }
+        input { width: 100%; background: #1e2536; border: 1px solid var(--border); color: white; padding: 16px; border-radius: 12px; font-size: 1rem; outline: none; }
         input:focus { border-color: var(--primary); }
+        .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
 
-        /* 🚀 검색 결과 리스트 디자인 강화 */
+        /* 🚀 검색 결과 리스트 */
         #autocompleteList { 
             position: absolute; top: 100%; left: 0; right: 0; background: #1e293b; 
             border: 2px solid var(--primary); border-radius: 12px; z-index: 10000; 
             max-height: 250px; overflow-y: auto; display: none; margin-top: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
         }
         .autocomplete-item { padding: 15px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
         .autocomplete-item:active { background: var(--primary); }
-        .stock-code { color: var(--text-sub); font-size: 0.8rem; font-weight: bold; }
+        .stock-code-tag { color: var(--text-sub); font-size: 0.8rem; font-weight: bold; }
 
-        .btn-main { width: 100%; padding: 16px; background: var(--primary); border: none; color: white; border-radius: 14px; font-weight: 800; font-size: 1rem; cursor: pointer; }
+        .btn-main { width: 100%; padding: 16px; background: var(--primary); border: none; color: white; border-radius: 12px; font-weight: 800; font-size: 1rem; cursor: pointer; }
+        .btn-sub { padding: 8px 16px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-main); border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.85rem; }
+
+        /* 리스트 & 차트 UI */
         .stock-item { background: rgba(255,255,255,0.02); border-radius: 18px; padding: 18px; margin-bottom: 12px; border: 1px solid var(--border); }
         .chart-dropdown { display: none; margin-top: 15px; text-align: center; }
         .chart-dropdown.active { display: block; }
         .chart-img { width: 100%; border-radius: 10px; filter: invert(93%) hue-rotate(180deg) brightness(1.05) contrast(1.1); }
+        
+        .period-selector { display: flex; justify-content: center; gap: 8px; margin-bottom: 12px; }
+        .period-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-sub); padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; cursor: pointer; font-weight: 600; }
+        .period-btn.active { background: var(--primary); color: white; }
+
+        .actions { display: flex; gap: 8px; width: 100%; margin-top: 15px; }
+        .action-btn { flex: 1; padding: 8px 0; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; border: none; text-align: center; }
+        
+        /* 모달 설정 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; backdrop-filter: blur(5px); }
+        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 92%; max-width: 400px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 24px; padding: 25px; z-index: 101; }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="header"><h1>나의 주식 비서 Pro</h1></div>
+
     <div class="card">
-        <div style="font-weight: 800; margin-bottom: 15px;">🔍 종목 검색 및 추가</div>
+        <div style="font-weight: 800; margin-bottom: 15px; font-size: 1.1rem;">📝 종목 추가</div>
+        <p style="color:var(--text-sub); font-size:0.8rem; margin-bottom:12px;">검색이 안 되면 종목명과 코드를 직접 입력하세요.</p>
+        
         <div class="search-area">
-            <input type="text" id="sSearch" placeholder="종목명 또는 코드 (예: 삼성, samg)" oninput="handleSearch(this.value)" autocomplete="off">
+            <input type="text" id="sName" placeholder="종목명 검색 (예: 삼성전자)" oninput="debouncedSearch(this.value)" autocomplete="off">
             <div id="autocompleteList"></div>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+        <div class="search-area">
+            <input type="tel" id="sCode" placeholder="종목코드 6자리 (검색시 자동입력)">
+        </div>
+        <div class="input-grid">
             <input type="number" id="sAvg" placeholder="내 평단가">
             <input type="number" id="sQty" placeholder="보유 수량">
         </div>
-        <input type="hidden" id="selectedCode">
-        <input type="hidden" id="selectedName">
+        
         <button class="btn-main" onclick="addStock()" id="addBtn">포트폴리오에 저장</button>
     </div>
-    <div id="stockListContainer"></div>
+
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-weight: 800; font-size: 1.1rem;">💼 포트폴리오</span>
+                <button class="btn-sub" onclick="refreshAllPrices()" id="refreshBtn">🔄 갱신</button>
+            </div>
+            <span id="totalYieldDisplay" style="font-size: 1.3rem; font-weight: 900;">0.00%</span>
+        </div>
+        <div id="stockListContainer"></div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="overlay" onclick="closeModals()"></div>
+<div class="modal" id="aModal">
+    <h3 id="aTitle" style="color:white; margin-bottom:5px;">진단</h3>
+    <div id="aSubtitle" style="color:var(--text-sub); font-size: 0.85rem; margin-bottom: 20px;"></div>
+    <div id="aContent" style="color:#cbd5e1; line-height:1.6; margin-bottom:20px;"></div>
+    
+    <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:10px; margin-bottom:20px; border: 1px solid var(--border);">
+        <label style="font-size:0.85rem; color:var(--text-sub); font-weight: bold; margin-bottom: 8px; display: block;">수동 데이터 수정</label>
+        <input type="text" id="uCode" placeholder="종목코드" style="margin-bottom:8px;">
+        <div style="display: flex; gap: 8px;">
+            <input type="number" id="uPrice" placeholder="현재가" style="flex: 1;">
+            <button onclick="updatePrice()" style="padding: 0 20px; background: var(--primary); color: white; border-radius: 12px; border:none; font-weight:bold;">저장</button>
+        </div>
+    </div>
+    <button onclick="askGemini()" class="btn-main" style="margin-bottom: 10px;">✨ AI 정밀 진단 복사</button>
+    <button onclick="closeModals()" style="width:100%; padding:14px; background:transparent; border:none; color:var(--text-sub); font-weight:bold;">닫기</button>
+</div>
+
+<div class="modal" id="waterModal">
+    <h3 style="color:white; font-size: 1.3rem; margin-bottom: 5px;">💧 물타기 계산</h3>
+    <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:20px;" id="wDesc"></p>
+    <input type="number" id="addMoney" placeholder="추가 투자할 금액 (원)" style="margin-bottom: 15px;" oninput="calcWater()">
+    <div id="wResult" style="display:none; text-align:center; padding: 15px; background: var(--bg-color); border-radius: 12px; border: 1px solid var(--green); margin-bottom: 15px;">
+        <span style="color:var(--text-sub); font-size:0.85rem;">예상 평단가</span><br>
+        <span style="color:var(--green); font-size:1.6rem; font-weight:900;" id="wNewAvg"></span>
+        <div style="color:white; font-size:0.9rem; margin-top:5px;" id="wBuyQty"></div>
+    </div>
+    <button onclick="closeModals()" class="btn-main" style="background:var(--border);">닫기</button>
 </div>
 
 <script>
     let myStocks = JSON.parse(localStorage.getItem('myStocks')) || [];
     let searchTimer = null;
+    let curIdx = -1;
+
     window.onload = renderList;
 
-    async function handleSearch(query) {
-        const list = document.getElementById('autocompleteList');
-        if (!query || query.length < 1) { list.style.display = 'none'; return; }
+    // 🚀 검색 디바운싱
+    function debouncedSearch(val) {
         clearTimeout(searchTimer);
-        searchTimer = setTimeout(async () => {
-            // 💡 보안 강화를 위해 다중 검색 경로 시도
-            const url = `https://ac.finance.naver.com/ac?q=${encodeURIComponent(query)}&q_enc=utf-8&st=111&r_format=json&t_koreng=1&run=1&rev=0`;
-            try {
-                const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${new Date().getTime()}`);
-                const data = JSON.parse((await res.json()).contents);
-                const items = data.items[0];
-                if (items && items.length > 0) {
-                    list.innerHTML = items.map(item => `
-                        <div class="autocomplete-item" onclick="selectStock('${item[0][0]}', '${item[1][0]}')">
-                            <span style="font-weight:700;">${item[0][0]}</span>
-                            <span class="stock-code">${item[1][0]}</span>
-                        </div>
-                    `).join('');
-                    list.style.display = 'block';
-                } else { list.style.display = 'none'; }
-            } catch (e) { console.log("검색 엔진 지연"); }
-        }, 300);
+        searchTimer = setTimeout(() => searchStock(val), 400); // 서버 부하 줄이기 위해 대기시간 늘림
     }
 
+    // 🚀 검색 실행 (안 되더라도 앱이 멈추지 않음)
+    async function searchStock(query) {
+        const list = document.getElementById('autocompleteList');
+        if (!query || query.length < 1) { list.style.display = 'none'; return; }
+
+        const url = `https://ac.finance.naver.com/ac?q=${encodeURIComponent(query)}&q_enc=utf-8&st=111&r_format=json&t_koreng=1&run=1&rev=0`;
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${new Date().getTime()}`;
+
+        try {
+            const res = await fetch(proxyUrl);
+            const data = JSON.parse((await res.json()).contents);
+            const items = data.items[0];
+
+            if (items && items.length > 0) {
+                list.innerHTML = items.map(item => `
+                    <div class="autocomplete-item" onclick="selectStock('${item[0][0]}', '${item[1][0]}')">
+                        <span style="font-weight:700; color:white;">${item[0][0]}</span>
+                        <span class="stock-code-tag">${item[1][0]}</span>
+                    </div>
+                `).join('');
+                list.style.display = 'block';
+            } else {
+                list.style.display = 'none';
+            }
+        } catch (e) {
+            // 통신 에러가 나도 리스트만 안 뜰 뿐, 수동 입력을 막지 않음!
+            console.log("검색 통신 에러 발생");
+        }
+    }
+
+    // 리스트 선택 시 폼 자동 채우기
     function selectStock(name, code) {
-        document.getElementById('sSearch').value = name;
-        document.getElementById('selectedCode').value = code;
-        document.getElementById('selectedName').value = name;
+        document.getElementById('sName').value = name;
+        document.getElementById('sCode').value = code; // 💡 화면에 보이는 코드칸에 입력됨
         document.getElementById('autocompleteList').style.display = 'none';
     }
 
+    // 🚀 절대 막히지 않는 종목 추가 로직
     async function addStock() {
-        const code = document.getElementById('selectedCode').value;
-        const name = document.getElementById('selectedName').value;
+        const name = document.getElementById('sName').value.trim();
+        const code = document.getElementById('sCode').value.trim(); // 💡 사용자가 수동으로 쳤을 수도 있음
         const avg = parseFloat(document.getElementById('sAvg').value);
         const qty = parseInt(document.getElementById('sQty').value) || 1;
 
-        if(!code || isNaN(avg)) return alert("검색 리스트에서 종목을 꼭 터치해 선택하세요!");
+        if(!name || !code || isNaN(avg)) {
+            alert("종목명, 종목코드(6자리), 평단가를 모두 입력해주세요!\n(검색이 안 되면 코드를 직접 입력하시면 됩니다.)");
+            return;
+        }
+
+        const btn = document.getElementById('addBtn');
+        btn.innerText = "현재가 확인 중... ⏳";
+        btn.disabled = true;
+
+        let currentPrice = 0;
 
         try {
             const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://m.stock.naver.com/api/stock/'+code+'/basic')}`);
             const data = JSON.parse((await res.json()).contents);
-            const price = parseInt(data.closePrice.replace(/,/g, ''));
-            myStocks.push({ name, code, avgPrice: avg, quantity: qty, currentPrice: price });
-            localStorage.setItem('myStocks', JSON.stringify(myStocks));
-            renderList();
-            document.getElementById('sSearch').value = ''; document.getElementById('sAvg').value = ''; document.getElementById('sQty').value = '';
-            document.getElementById('selectedCode').value = '';
-        } catch (e) { alert("현재가를 가져오지 못했습니다. 잠시 후 다시 시도하세요."); }
+            currentPrice = parseInt(data.closePrice.replace(/,/g, ''));
+        } catch (e) {
+            // 💡 [핵심] 가격 수집마저 차단당했다면 멈추지 않고 사용자에게 묻는다!
+            const manualPrice = prompt(`'${name}'의 현재가를 자동으로 불러오지 못했습니다.\nHTS/MTS에서 확인하신 '현재가'를 숫자로 입력해주세요!`);
+            if(manualPrice) {
+                currentPrice = parseInt(manualPrice.replace(/,/g, ''));
+            } else {
+                btn.innerText = "포트폴리오에 저장";
+                btn.disabled = false;
+                return; // 사용자가 취소 누름
+            }
+        }
+
+        if(isNaN(currentPrice)) currentPrice = avg; // 예외 상황 대비
+
+        myStocks.push({ name, code, avgPrice: avg, quantity: qty, currentPrice });
+        localStorage.setItem('myStocks', JSON.stringify(myStocks));
+        renderList();
+        
+        document.getElementById('sName').value = ''; 
+        document.getElementById('sCode').value = ''; 
+        document.getElementById('sAvg').value = ''; 
+        document.getElementById('sQty').value = '';
+        
+        btn.innerText = "포트폴리오에 저장";
+        btn.disabled = false;
+    }
+
+    // 전체 새로고침
+    async function refreshAllPrices() {
+        if(myStocks.length === 0) return;
+        const btn = document.getElementById('refreshBtn');
+        btn.innerText = "⏳";
+        let count = 0;
+        for (let i = 0; i < myStocks.length; i++) {
+            if(myStocks[i].code) {
+                try {
+                    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://m.stock.naver.com/api/stock/'+myStocks[i].code+'/basic')}`);
+                    const data = JSON.parse((await res.json()).contents);
+                    myStocks[i].currentPrice = parseInt(data.closePrice.replace(/,/g, ''));
+                    count++;
+                } catch(e) {}
+            }
+        }
+        localStorage.setItem('myStocks', JSON.stringify(myStocks));
+        renderList();
+        btn.innerText = "🔄 갱신";
+        if(count===0) alert("방화벽으로 인해 갱신에 실패했습니다.\n[수정/진단] 버튼을 눌러 가격을 수정하세요.");
+    }
+
+    function getChartUrl(code, period = 'day') {
+        return `https://ssl.pstatic.net/imgfinance/chart/item/candle/${period}/${code}.png?${Date.now()}`;
+    }
+
+    function toggleChart(idx) { document.getElementById(`chart-${idx}`).classList.toggle('active'); }
+    
+    function changePeriod(idx, code, period, btnEl) {
+        document.getElementById(`chart-img-${idx}`).src = getChartUrl(code, period);
+        document.getElementById(`chart-${idx}`).querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+        btnEl.classList.add('active');
     }
 
     function renderList() {
         const container = document.getElementById('stockListContainer');
         container.innerHTML = '';
-        if(myStocks.length === 0) { container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-sub);">등록된 종목이 없습니다.</div>'; return; }
+        if(myStocks.length === 0) { container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-sub);">등록된 종목이 없습니다.</div>'; document.getElementById('totalYieldDisplay').innerText = '0.00%'; document.getElementById('totalYieldDisplay').style.color = 'white'; return; }
+        
+        let totalInv = 0, totalCur = 0;
         myStocks.forEach((s, i) => {
+            totalInv += s.avgPrice * s.quantity; totalCur += s.currentPrice * s.quantity;
             const pr = (((s.currentPrice - s.avgPrice) / s.avgPrice) * 100).toFixed(2);
+            const color = pr > 0 ? 'var(--red)' : 'var(--blue)';
+            const bg = pr > 0 ? 'rgba(244, 63, 94, 0.15)' : 'rgba(59, 130, 246, 0.15)';
+            const sign = pr > 0 ? '+' : '';
+
             container.innerHTML += `
                 <div class="stock-item">
                     <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleChart(${i})">
                         <div>
-                            <div style="font-weight:800; font-size:1.1rem;">${s.name}</div>
+                            <div style="font-weight:800; font-size:1.1rem; color:white;">${s.name} <span style="font-size:0.8rem; color:var(--text-sub); font-weight:normal;">▼</span></div>
                             <div style="font-size:0.85rem; color:var(--text-sub);">평단 ${s.avgPrice.toLocaleString()}원</div>
                         </div>
                         <div style="text-align:right;">
-                            <div style="font-weight:800; color:${pr>0?'var(--red)':'var(--blue)'}">${s.currentPrice.toLocaleString()}원</div>
-                            <div style="font-size:0.9rem; font-weight:700; color:${pr>0?'var(--red)':'var(--blue)'}">${pr}%</div>
+                            <div style="font-weight:800; color:${color}">${s.currentPrice.toLocaleString()}원</div>
+                            <div style="font-size:0.85rem; font-weight:700; color:${color}; background:${bg}; padding:3px 8px; border-radius:6px; display:inline-block; margin-top:4px;">${sign}${pr}%</div>
                         </div>
                     </div>
                     <div class="chart-dropdown" id="chart-${i}">
-                        <img src="https://ssl.pstatic.net/imgfinance/chart/item/candle/day/${s.code}.png?${Date.now()}" class="chart-img">
-                        <button onclick="delStock(${i})" style="width:100%; padding:10px; margin-top:15px; background:rgba(255,255,255,0.05); border:none; color:var(--text-sub); border-radius:10px;">삭제</button>
+                        <div class="period-selector">
+                            <button class="period-btn active" onclick="changePeriod(${i}, '${s.code}', 'day', this); event.stopPropagation();">일봉</button>
+                            <button class="period-btn" onclick="changePeriod(${i}, '${s.code}', 'week', this); event.stopPropagation();">주봉</button>
+                            <button class="period-btn" onclick="changePeriod(${i}, '${s.code}', 'month', this); event.stopPropagation();">월봉</button>
+                        </div>
+                        <img src="${getChartUrl(s.code, 'day')}" class="chart-img" id="chart-img-${i}">
+                        <div class="actions">
+                            <button class="action-btn" style="background:rgba(16, 185, 129, 0.15); color:#34d399;" onclick="openWater(${i}); event.stopPropagation();">💧 물타기</button>
+                            <button class="action-btn" style="background:rgba(99, 102, 241, 0.15); color:#818cf8;" onclick="openA(${i}); event.stopPropagation();">수정/진단🔍</button>
+                            <button class="action-btn" style="background:rgba(255, 255, 255, 0.05); color:var(--text-sub);" onclick="delStock(${i}); event.stopPropagation();">삭제</button>
+                        </div>
                     </div>
                 </div>`;
         });
+        
+        const totalPr = (((totalCur - totalInv) / totalInv) * 100).toFixed(2);
+        document.getElementById('totalYieldDisplay').innerText = `${totalPr > 0 ? '+' : ''}${totalPr}%`;
+        document.getElementById('totalYieldDisplay').style.color = totalPr > 0 ? 'var(--red)' : 'var(--blue)';
     }
 
-    function toggleChart(idx) { document.getElementById(`chart-${idx}`).classList.toggle('active'); }
     function delStock(idx) { if(confirm("삭제하시겠습니까?")) { myStocks.splice(idx, 1); localStorage.setItem('myStocks', JSON.stringify(myStocks)); renderList(); } }
+    function closeModals() { document.querySelectorAll('.modal, .modal-overlay').forEach(m => m.style.display = 'none'); }
+
+    function openA(i) {
+        curIdx = i; const s = myStocks[i];
+        document.getElementById('aTitle').innerText = s.name;
+        document.getElementById('aSubtitle').innerText = `수익률: ${(((s.currentPrice-s.avgPrice)/s.avgPrice)*100).toFixed(2)}%`;
+        document.getElementById('uCode').value = s.code; document.getElementById('uPrice').value = s.currentPrice;
+        document.getElementById('overlay').style.display = 'block'; document.getElementById('aModal').style.display = 'block';
+    }
+
+    function updatePrice() {
+        myStocks[curIdx].code = document.getElementById('uCode').value;
+        myStocks[curIdx].currentPrice = parseFloat(document.getElementById('uPrice').value);
+        localStorage.setItem('myStocks', JSON.stringify(myStocks)); renderList(); closeModals();
+    }
+
+    function askGemini() {
+        const s = myStocks[curIdx];
+        const txt = `주식 [${s.name}] 평단 ${s.avgPrice}, 수량 ${s.quantity}, 현재가 ${s.currentPrice}인데 대응 전략 짜줘.`;
+        navigator.clipboard.writeText(txt).then(() => { alert("질문이 복사되었습니다!\nGemini 앱에 붙여넣기 하세요."); window.open('https://gemini.google.com/', '_blank'); });
+    }
+
+    function openWater(i) {
+        curIdx = i; const s = myStocks[i];
+        document.getElementById('wDesc').innerText = `${s.name} (${s.currentPrice.toLocaleString()}원)`;
+        document.getElementById('overlay').style.display = 'block'; document.getElementById('waterModal').style.display = 'block';
+    }
+
+    function calcWater() {
+        const money = parseFloat(document.getElementById('addMoney').value); const s = myStocks[curIdx];
+        if(!money) return document.getElementById('wResult').style.display = 'none';
+        const addQty = Math.floor(money / s.currentPrice);
+        const newAvg = Math.floor(((s.avgPrice * s.quantity) + (addQty * s.currentPrice)) / (s.quantity + addQty));
+        document.getElementById('wNewAvg').innerText = `${newAvg.toLocaleString()}원`;
+        document.getElementById('wBuyQty').innerText = `✅ ${addQty.toLocaleString()}주 추가 매수 가능`;
+        document.getElementById('wResult').style.display = 'block';
+    }
 </script>
 </body>
 </html>
