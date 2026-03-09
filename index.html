@@ -520,21 +520,19 @@
     function delStock(idx) { if(confirm("삭제하시겠습니까?")) { myStocks.splice(idx, 1); localStorage.setItem('myStocks', JSON.stringify(myStocks)); renderList(); } }
     function closeModals() { document.querySelectorAll('.modal, .modal-overlay').forEach(m => m.style.display = 'none'); }
 
-    // 💡 수정 모달 열 때 평단가, 수량도 기존 데이터로 채워줌
     function openA(i) {
         curIdx = i; const s = myStocks[i];
         document.getElementById('aTitle').innerText = s.name;
         document.getElementById('aSubtitle').innerText = `수익률: ${(((s.currentPrice-s.avgPrice)/s.avgPrice)*100).toFixed(2)}%`;
         
         document.getElementById('uCode').value = s.code.includes('@') ? s.code.split('@')[1] : s.code; 
-        document.getElementById('uAvg').value = s.avgPrice; // 평단가 입력란
-        document.getElementById('uQty').value = s.quantity; // 수량 입력란
+        document.getElementById('uAvg').value = s.avgPrice; 
+        document.getElementById('uQty').value = s.quantity; 
         document.getElementById('uPrice').value = s.currentPrice;
         
         document.getElementById('overlay').style.display = 'block'; document.getElementById('aModal').style.display = 'block';
     }
 
-    // 💡 저장 버튼 누르면 평단가, 수량도 덮어쓰기 적용
     function updatePrice() {
         const uCode = document.getElementById('uCode').value.toUpperCase();
         if(/[A-Z]/.test(uCode) && !uCode.includes('@')) {
@@ -543,7 +541,6 @@
             myStocks[curIdx].code = uCode;
         }
         
-        // 입력값이 비어있지 않으면 새 값으로, 비어있으면 기존 값으로 유지
         myStocks[curIdx].avgPrice = parseFloat(document.getElementById('uAvg').value) || myStocks[curIdx].avgPrice;
         myStocks[curIdx].quantity = parseFloat(document.getElementById('uQty').value) || myStocks[curIdx].quantity;
         myStocks[curIdx].currentPrice = parseFloat(document.getElementById('uPrice').value) || myStocks[curIdx].currentPrice;
@@ -553,12 +550,32 @@
         closeModals();
     }
 
+    // 💡 AI 분석 프롬프트 초강력 업그레이드!
     function askGemini() {
         const s = myStocks[curIdx];
         const isUS = /[a-zA-Z]/.test(s.code);
         const curr = isUS ? '달러' : '원';
-        const txt = `주식 [${s.name}] 평단 ${s.avgPrice}${curr}, 수량 ${s.quantity}주, 현재가 ${s.currentPrice}${curr} 인데 대응 전략 짜줘.`;
-        navigator.clipboard.writeText(txt).then(() => { alert("질문이 복사되었습니다!\nGemini 앱에 붙여넣기 하세요."); window.open('https://gemini.google.com/', '_blank'); });
+        
+        // 거시 경제, 정치, 트렌드를 모두 포함하는 전문가 수준의 분석 요청
+        const txt = `전문 애널리스트로서 현재 보유 중인 [${s.name}] 주식에 대한 심층 분석 리포트를 작성해 줘.
+
+[나의 투자 현황]
+- 매수 평단가: ${s.avgPrice}${curr}
+- 보유 수량: ${s.quantity}주
+- 현재 주가: ${s.currentPrice}${curr}
+
+위 현황을 바탕으로 다음 4가지 관점을 종합하여 상세한 전망과 맞춤형 대응 전략을 분석해 줘:
+1. 거시 경제: 현재 글로벌 및 한국의 경제 상황(금리, 인플레이션 등)이 이 종목에 미치는 영향
+2. 정치/국제 정세: 주요 국가의 정책이나 지정학적 리스크가 미치는 영향
+3. 산업 트렌드: 이 기업이 속한 섹터의 최신 시장 트렌드와 미래 전망
+4. 맞춤형 전략: 내 평단가와 수익률 상황을 고려했을 때의 구체적인 대응 전략 (추가 매수, 홀딩, 부분 매도 등)과 목표가/손절가 제시
+
+최대한 논리적이고 가독성 좋게, 실제 증권사 리포트처럼 작성해 줘.`;
+
+        navigator.clipboard.writeText(txt).then(() => { 
+            alert("✨ 심층 분석용 전문가 프롬프트가 복사되었습니다!\\n\\nGemini 채팅창에 그대로 붙여넣기 하시면 엄청난 리포트가 나올 거예요."); 
+            window.open('https://gemini.google.com/', '_blank'); 
+        });
     }
 
     function openWater(i) {
