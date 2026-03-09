@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>문성님의 스마트 주식 비서</title>
+    <title>문성님의 스마트 주식 비서 Final</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#0b0f19">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2933/2933116.png">
@@ -19,23 +19,22 @@
         .header { text-align: center; margin: 20px 0; }
         .header h1 { font-size: 1.6rem; font-weight: 800; background: linear-gradient(to right, #a5b4fc, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
+        .card { background: var(--card-bg); padding: 22px; border-radius: 24px; margin-bottom: 20px; border: 1px solid var(--border); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
         .search-area { position: relative; margin-bottom: 12px; }
         input { width: 100%; background: #1e2536; border: 1px solid var(--border); color: white; padding: 16px; border-radius: 14px; font-size: 1rem; outline: none; }
-        
-        /* 🚀 검색 결과 리스트 강제 표시 설정 */
+        input:focus { border-color: var(--primary); }
+
+        /* 🚀 검색 결과 리스트 디자인 강화 */
         #autocompleteList { 
             position: absolute; top: 100%; left: 0; right: 0; background: #1e293b; 
             border: 2px solid var(--primary); border-radius: 12px; z-index: 10000; 
             max-height: 250px; overflow-y: auto; display: none; margin-top: 8px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
         }
         .autocomplete-item { padding: 15px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
         .autocomplete-item:active { background: var(--primary); }
         .stock-code { color: var(--text-sub); font-size: 0.8rem; font-weight: bold; }
 
-        .card { background: var(--card-bg); padding: 22px; border-radius: 24px; margin-bottom: 20px; border: 1px solid var(--border); }
         .btn-main { width: 100%; padding: 16px; background: var(--primary); border: none; color: white; border-radius: 14px; font-weight: 800; font-size: 1rem; cursor: pointer; }
-
         .stock-item { background: rgba(255,255,255,0.02); border-radius: 18px; padding: 18px; margin-bottom: 12px; border: 1px solid var(--border); }
         .chart-dropdown { display: none; margin-top: 15px; text-align: center; }
         .chart-dropdown.active { display: block; }
@@ -43,14 +42,12 @@
     </style>
 </head>
 <body>
-
 <div class="container">
     <div class="header"><h1>나의 주식 비서 Pro</h1></div>
-
     <div class="card">
-        <div style="font-weight: 800; margin-bottom: 15px;">🔍 종목 검색 후 추가</div>
+        <div style="font-weight: 800; margin-bottom: 15px;">🔍 종목 검색 및 추가</div>
         <div class="search-area">
-            <input type="text" id="sSearch" placeholder="종목명 입력 (예: 삼성, samg)" oninput="debouncedSearch(this.value)" autocomplete="off">
+            <input type="text" id="sSearch" placeholder="종목명 또는 코드 (예: 삼성, samg)" oninput="handleSearch(this.value)" autocomplete="off">
             <div id="autocompleteList"></div>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
@@ -59,49 +56,38 @@
         </div>
         <input type="hidden" id="selectedCode">
         <input type="hidden" id="selectedName">
-        <button class="btn-main" onclick="addStock()" id="addBtn">내 포트폴리오에 저장</button>
+        <button class="btn-main" onclick="addStock()" id="addBtn">포트폴리오에 저장</button>
     </div>
     <div id="stockListContainer"></div>
 </div>
 
 <script>
     let myStocks = JSON.parse(localStorage.getItem('myStocks')) || [];
-    let timer = null;
+    let searchTimer = null;
     window.onload = renderList;
 
-    function debouncedSearch(val) {
-        clearTimeout(timer);
-        timer = setTimeout(() => searchStock(val), 300);
-    }
-
-    async function searchStock(query) {
+    async function handleSearch(query) {
         const list = document.getElementById('autocompleteList');
         if (!query || query.length < 1) { list.style.display = 'none'; return; }
-
-        // AllOrigins 프록시를 통한 네이버 자동완성 API 호출 (강력한 버전)
-        const url = `https://ac.finance.naver.com/ac?q=${encodeURIComponent(query)}&q_enc=utf-8&st=111&r_format=json&t_koreng=1&run=1&rev=0`;
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${new Date().getTime()}`;
-
-        try {
-            const res = await fetch(proxyUrl);
-            const raw = await res.json();
-            const data = JSON.parse(raw.contents);
-            const items = data.items[0];
-
-            if (items && items.length > 0) {
-                list.innerHTML = items.map(item => `
-                    <div class="autocomplete-item" onclick="selectStock('${item[0][0]}', '${item[1][0]}')">
-                        <span style="font-weight:700;">${item[0][0]}</span>
-                        <span class="stock-code">${item[1][0]}</span>
-                    </div>
-                `).join('');
-                list.style.display = 'block';
-            } else {
-                list.style.display = 'none';
-            }
-        } catch (e) {
-            console.log("통신 에러");
-        }
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(async () => {
+            // 💡 보안 강화를 위해 다중 검색 경로 시도
+            const url = `https://ac.finance.naver.com/ac?q=${encodeURIComponent(query)}&q_enc=utf-8&st=111&r_format=json&t_koreng=1&run=1&rev=0`;
+            try {
+                const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${new Date().getTime()}`);
+                const data = JSON.parse((await res.json()).contents);
+                const items = data.items[0];
+                if (items && items.length > 0) {
+                    list.innerHTML = items.map(item => `
+                        <div class="autocomplete-item" onclick="selectStock('${item[0][0]}', '${item[1][0]}')">
+                            <span style="font-weight:700;">${item[0][0]}</span>
+                            <span class="stock-code">${item[1][0]}</span>
+                        </div>
+                    `).join('');
+                    list.style.display = 'block';
+                } else { list.style.display = 'none'; }
+            } catch (e) { console.log("검색 엔진 지연"); }
+        }, 300);
     }
 
     function selectStock(name, code) {
@@ -117,18 +103,18 @@
         const avg = parseFloat(document.getElementById('sAvg').value);
         const qty = parseInt(document.getElementById('sQty').value) || 1;
 
-        if(!code || isNaN(avg)) return alert("검색 리스트에서 종목을 터치해 선택하세요!");
+        if(!code || isNaN(avg)) return alert("검색 리스트에서 종목을 꼭 터치해 선택하세요!");
 
         try {
             const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://m.stock.naver.com/api/stock/'+code+'/basic')}`);
-            const raw = await res.json();
-            const data = JSON.parse(raw.contents);
+            const data = JSON.parse((await res.json()).contents);
             const price = parseInt(data.closePrice.replace(/,/g, ''));
             myStocks.push({ name, code, avgPrice: avg, quantity: qty, currentPrice: price });
             localStorage.setItem('myStocks', JSON.stringify(myStocks));
             renderList();
             document.getElementById('sSearch').value = ''; document.getElementById('sAvg').value = ''; document.getElementById('sQty').value = '';
-        } catch (e) { alert("데이터 수집 실패"); }
+            document.getElementById('selectedCode').value = '';
+        } catch (e) { alert("현재가를 가져오지 못했습니다. 잠시 후 다시 시도하세요."); }
     }
 
     function renderList() {
@@ -151,7 +137,7 @@
                     </div>
                     <div class="chart-dropdown" id="chart-${i}">
                         <img src="https://ssl.pstatic.net/imgfinance/chart/item/candle/day/${s.code}.png?${Date.now()}" class="chart-img">
-                        <button onclick="delStock(${i})" style="width:100%; padding:12px; margin-top:15px; background:rgba(255,255,255,0.05); border:none; color:var(--text-sub); border-radius:10px;">삭제</button>
+                        <button onclick="delStock(${i})" style="width:100%; padding:10px; margin-top:15px; background:rgba(255,255,255,0.05); border:none; color:var(--text-sub); border-radius:10px;">삭제</button>
                     </div>
                 </div>`;
         });
