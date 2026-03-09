@@ -13,6 +13,7 @@
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2933/2933116.png">
 
     <style>
+        /* 🎨 프리미엄 다크 UI */
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         :root { 
             --bg-color: #0b0f19; --card-bg: #151b2b; --primary: #4f46e5; --border: #262f45; 
@@ -22,31 +23,33 @@
         body { font-family: 'Pretendard', sans-serif; background: var(--bg-color); color: var(--text-main); padding: 15px; }
         .container { max-width: 600px; margin: 0 auto; }
         
-        .header { text-align: center; margin: 15px 0 25px 0; }
+        .header { text-align: center; margin: 20px 0; }
         .header h1 { font-size: 1.6rem; font-weight: 800; background: linear-gradient(to right, #a5b4fc, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
-        /* 검색창 UI */
+        /* 🔍 검색창 고도화 */
         .search-area { position: relative; margin-bottom: 12px; }
-        input { width: 100%; background: #1e2536; border: 1px solid var(--border); color: white; padding: 16px; border-radius: 14px; font-size: 1rem; outline: none; }
+        input { width: 100%; background: #1e2536; border: 1px solid var(--border); color: white; padding: 16px; border-radius: 14px; font-size: 1rem; outline: none; transition: 0.2s; }
         input:focus { border-color: var(--primary); }
         
-        .autocomplete-list { 
+        /* 검색 결과 리스트 */
+        #autocompleteList { 
             position: absolute; top: 100%; left: 0; right: 0; background: #1e293b; 
             border: 2px solid var(--primary); border-radius: 12px; z-index: 9999; 
             max-height: 250px; overflow-y: auto; display: none; margin-top: 8px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.7);
         }
         .autocomplete-item { padding: 15px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .autocomplete-item:hover { background: var(--primary); color: white; }
-        .code-tag { color: var(--text-sub); font-size: 0.8rem; font-weight: 600; }
+        .autocomplete-item:active { background: var(--primary); }
+        .stock-code { color: var(--text-sub); font-size: 0.85rem; font-weight: 600; }
 
         .card { background: var(--card-bg); padding: 22px; border-radius: 24px; margin-bottom: 20px; border: 1px solid var(--border); }
         .btn-main { width: 100%; padding: 16px; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; color: white; border-radius: 14px; font-weight: 800; font-size: 1rem; cursor: pointer; }
 
         .stock-item { background: rgba(255,255,255,0.02); border-radius: 18px; padding: 18px; margin-bottom: 12px; border: 1px solid var(--border); }
         .chart-dropdown { display: none; margin-top: 15px; text-align: center; }
-        .chart-dropdown.active { display: block; }
-        .chart-img { width: 100%; border-radius: 10px; filter: invert(93%) hue-rotate(180deg) brightness(1.05) contrast(1.1); }
+        .chart-dropdown.active { display: block; animation: fadeIn 0.3s; }
+        .chart-img { width: 100%; border-radius: 10px; filter: invert(93%) hue-rotate(180deg) brightness(1.05) contrast(1.1); background: #0b0f19; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -57,16 +60,16 @@
     <div class="card">
         <div style="font-weight: 800; margin-bottom: 15px;">🔍 종목 검색</div>
         <div class="search-area">
-            <input type="text" id="sSearch" placeholder="종목명 입력 (예: 삼성, samg)" oninput="handleSearch(this.value)" autocomplete="off">
-            <div id="autocompleteList" class="autocomplete-list"></div>
+            <input type="text" id="sSearch" placeholder="종목명 입력 (예: 삼성, samg)" oninput="searchStock(this.value)" autocomplete="off">
+            <div id="autocompleteList"></div>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-            <input type="number" id="sAvg" placeholder="평단가">
-            <input type="number" id="sQty" placeholder="수량">
+            <input type="number" id="sAvg" placeholder="내 평단가">
+            <input type="number" id="sQty" placeholder="보유 수량">
         </div>
         <input type="hidden" id="selectedCode">
         <input type="hidden" id="selectedName">
-        <button class="btn-main" onclick="addStock()" id="addBtn">종목 추가하기</button>
+        <button class="btn-main" onclick="addStock()" id="addBtn">포트폴리오에 추가</button>
     </div>
 
     <div id="stockListContainer"></div>
@@ -74,32 +77,31 @@
 
 <script>
     let myStocks = JSON.parse(localStorage.getItem('myStocks')) || [];
-    let searchTimeout = null;
+    let searchTimer = null;
 
     window.onload = renderList;
 
-    // 🚀 검색 핸들러 (입력 시 실시간 반응)
-    async function handleSearch(query) {
+    // 🚀 검색 기능 (강력한 하이브리드 엔진)
+    async function searchStock(query) {
         const list = document.getElementById('autocompleteList');
         if (!query || query.length < 1) { list.style.display = 'none'; return; }
 
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(async () => {
-            // 네이버 검색 API + 프록시 서버 연동
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(async () => {
+            // AllOrigins 프록시를 통한 네이버 자동완성 API 호출
             const url = `https://ac.finance.naver.com/ac?q=${encodeURIComponent(query)}&q_enc=utf-8&st=111&r_format=json&t_koreng=1&run=1&rev=0`;
             const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
 
             try {
                 const res = await fetch(proxyUrl);
-                const raw = await res.json();
-                const data = JSON.parse(raw.contents);
+                const data = JSON.parse((await res.json()).contents);
                 const items = data.items[0];
 
                 if (items && items.length > 0) {
                     list.innerHTML = items.map(item => `
                         <div class="autocomplete-item" onclick="selectStock('${item[0][0]}', '${item[1][0]}')">
-                            <span style="font-weight:700;">${item[0][0]}</span>
-                            <span class="code-tag">${item[1][0]}</span>
+                            <span style="font-weight:700; color:white;">${item[0][0]}</span>
+                            <span class="stock-code">${item[1][0]}</span>
                         </div>
                     `).join('');
                     list.style.display = 'block';
@@ -107,7 +109,7 @@
                     list.style.display = 'none';
                 }
             } catch (e) {
-                console.log("검색 통신 에러");
+                console.log("검색 데이터 수집 실패");
             }
         }, 300);
     }
@@ -125,11 +127,13 @@
         const avg = parseFloat(document.getElementById('sAvg').value);
         const qty = parseInt(document.getElementById('sQty').value) || 1;
 
-        if(!code || isNaN(avg)) return alert("검색 결과에서 종목을 선택하세요!");
+        if(!code || isNaN(avg)) return alert("종목을 검색 결과에서 꼭 선택해주세요!");
+
+        const btn = document.getElementById('addBtn');
+        btn.innerText = "조회 중...";
 
         try {
-            const url = `https://m.stock.naver.com/api/stock/${code}/basic`;
-            const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+            const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://m.stock.naver.com/api/stock/'+code+'/basic')}`);
             const data = JSON.parse((await res.json()).contents);
             const price = parseInt(data.closePrice.replace(/,/g, ''));
 
@@ -137,23 +141,22 @@
             localStorage.setItem('myStocks', JSON.stringify(myStocks));
             renderList();
             document.getElementById('sSearch').value = ''; document.getElementById('sAvg').value = ''; document.getElementById('sQty').value = '';
-        } catch (e) { alert("가격 정보를 가져오지 못했습니다."); }
+        } catch (e) { alert("가격을 가져오지 못했습니다."); }
+        btn.innerText = "포트폴리오에 추가";
     }
 
     function renderList() {
         const container = document.getElementById('stockListContainer');
         container.innerHTML = '';
-        if(myStocks.length === 0) {
-            container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-sub);">종목을 추가해 보세요.</div>';
-            return;
-        }
+        if(myStocks.length === 0) { container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-sub);">등록된 종목이 없습니다.</div>'; return; }
+        
         myStocks.forEach((s, i) => {
             const pr = (((s.currentPrice - s.avgPrice) / s.avgPrice) * 100).toFixed(2);
             container.innerHTML += `
                 <div class="stock-item">
                     <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleChart(${i})">
                         <div>
-                            <div style="font-weight:800; font-size:1.1rem;">${s.name}</div>
+                            <div style="font-weight:800; font-size:1.1rem; color:white;">${s.name}</div>
                             <div style="font-size:0.85rem; color:var(--text-sub);">평단 ${s.avgPrice.toLocaleString()}원</div>
                         </div>
                         <div style="text-align:right;">
@@ -163,7 +166,7 @@
                     </div>
                     <div class="chart-dropdown" id="chart-${i}">
                         <img src="https://ssl.pstatic.net/imgfinance/chart/item/candle/day/${s.code}.png?${Date.now()}" class="chart-img">
-                        <button onclick="delStock(${i})" style="width:100%; padding:12px; margin-top:15px; background:rgba(255,255,255,0.05); border:none; color:var(--text-sub); border-radius:10px;">삭제</button>
+                        <button onclick="delStock(${i})" style="width:100%; padding:10px; margin-top:15px; background:rgba(255,255,255,0.05); border:none; color:var(--text-sub); border-radius:10px;">종목 삭제</button>
                     </div>
                 </div>`;
         });
