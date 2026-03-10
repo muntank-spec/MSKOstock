@@ -39,12 +39,16 @@
         .autocomplete-item { padding: 15px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
         .autocomplete-item:active { background: var(--primary); }
         .stock-code-tag { color: var(--text-sub); font-size: 0.8rem; font-weight: bold; }
-        .search-status { padding: 15px; text-align: center; font-size: 0.85rem; color: var(--text-sub); }
-
+        
         .btn-main { width: 100%; padding: 16px; background: var(--primary); border: none; color: white; border-radius: 12px; font-weight: 800; font-size: 1rem; cursor: pointer; }
         .btn-sub { padding: 8px 16px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-main); border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.85rem; }
 
         .stock-item { background: rgba(255,255,255,0.02); border-radius: 18px; padding: 18px; margin-bottom: 12px; border: 1px solid var(--border); }
+        
+        /* 순서 조절 버튼 스타일 */
+        .order-btns { display: flex; flex-direction: column; gap: 4px; margin-right: 12px; }
+        .order-btn { background: #1e2536; border: none; color: var(--text-sub); width: 24px; height: 24px; border-radius: 4px; font-size: 10px; cursor: pointer; }
+
         .chart-dropdown { display: none; margin-top: 15px; text-align: center; }
         .chart-dropdown.active { display: block; }
         .chart-img { width: 100%; border-radius: 10px; filter: invert(93%) hue-rotate(180deg) brightness(1.05) contrast(1.1); }
@@ -116,15 +120,12 @@
     <div id="aSubtitle" style="color:var(--text-sub); font-size: 0.85rem; margin-bottom: 20px;"></div>
     
     <div style="background:rgba(0,0,0,0.3); padding:15px; border-radius:10px; margin-bottom:20px; border: 1px solid var(--border);">
-        <label style="font-size:0.85rem; color:var(--text-sub); font-weight: bold; margin-bottom: 8px; display: block;">수동 데이터 수정 (추가 매수 시 업데이트)</label>
-        
+        <label style="font-size:0.85rem; color:var(--text-sub); font-weight: bold; margin-bottom: 8px; display: block;">데이터 업데이트</label>
         <input type="text" id="uCode" placeholder="종목코드" style="margin-bottom:8px;">
-        
         <div style="display: flex; gap: 8px; margin-bottom: 8px;">
             <input type="number" id="uAvg" placeholder="내 평단가" style="flex: 1;">
             <input type="number" id="uQty" placeholder="보유 수량" style="flex: 1;">
         </div>
-        
         <div style="display: flex; gap: 8px;">
             <input type="number" id="uPrice" placeholder="현재가" style="flex: 1;">
             <button onclick="updatePrice()" style="padding: 0 20px; background: var(--primary); color: white; border-radius: 12px; border:none; font-weight:bold;">저장</button>
@@ -148,490 +149,240 @@
 </div>
 
 <script>
-    // 💡 1. 사파리용 완벽한 정사각형 PNG 아이콘 자동 생성 마법!
+    // 💡 1. 아이콘 생성 (기존 유지)
     (function createAppleIcon() {
         const canvas = document.createElement('canvas');
-        canvas.width = 180; 
-        canvas.height = 180;
+        canvas.width = 180; canvas.height = 180;
         const ctx = canvas.getContext('2d');
-        
-        // 짙은 남색 배경을 투명한 곳 없이 꽉 채움 (검은 모서리 완벽 차단!)
         ctx.fillStyle = '#151b2b';
         ctx.fillRect(0, 0, 180, 180);
-        
-        // 우상향 차트 이모지 그리기
         ctx.font = '100px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('📈', 90, 100);
-        
-        // 진짜 PNG 파일로 변환해서 헤더에 몰래 쏙!
         const link = document.createElement('link');
         link.rel = 'apple-touch-icon';
         link.href = canvas.toDataURL('image/png');
         document.head.appendChild(link);
     })();
 
-
-    // 💡 2. 초기 실행 시 빈 화면이 되지 않도록 샘플 포트폴리오 자동 세팅!
     let myStocks = JSON.parse(localStorage.getItem('myStocks')) || [
         { name: "SAMG엔터", code: "419530", avgPrice: 15000, quantity: 100, currentPrice: 15000 },
         { name: "TIME 미국나스닥100액티브", code: "426030", avgPrice: 10000, quantity: 50, currentPrice: 10000 },
         { name: "SCHD (배당성장)", code: "NYS@SCHD", avgPrice: 75, quantity: 10, currentPrice: 75 }
     ];
     let curIdx = -1;
-    let currentExchangeRate = 1330;
+    let currentExchangeRate = 1350;
 
+    // 종목 DB (기본 데이터)
     const localStockDB = [
         { name: "TIME 미국나스닥100액티브", code: "426030" },
         { name: "TIME 미국S&P500액티브", code: "426020" },
-        { name: "TIME 글로벌AI인공지능액티브", code: "456600" },
         { name: "TIGER 미국나스닥100", code: "133690" },
-        { name: "TIGER 미국S&P500", code: "360750" },
-        { name: "TIGER 미국배당다우존스", code: "458730" },
-        { name: "TIGER 미국테크TOP10 INDXX", code: "381170" },
-        { name: "TIGER 미국필라델피아반도체나스닥", code: "381180" },
-        { name: "TIGER 글로벌리튬&2차전지SOLACTIVE", code: "394640" },
-        { name: "TIGER 미국나스닥100커버드콜(합성)", code: "441680" },
-        { name: "TIGER 인도니프티50", code: "453870" },
-        { name: "TIGER 2차전지테마", code: "305540" },
-        { name: "KODEX 200", code: "069500" },
-        { name: "KODEX 레버리지", code: "122630" },
-        { name: "KODEX 200선물인버스2X (곱버스)", code: "252670" },
-        { name: "KODEX 코스닥150레버리지", code: "233740" },
-        { name: "KODEX 코스닥150선물인버스", code: "251340" },
-        { name: "KODEX 2차전지산업", code: "305720" },
-        { name: "KODEX 미국나스닥100TR", code: "379800" },
-        { name: "KODEX 미국S&P500TR", code: "379810" },
-        { name: "KODEX 미국배당다우존스", code: "482060" },
-        { name: "ACE 미국나스닥100", code: "367380" },
-        { name: "ACE 미국S&P500", code: "360200" },
-        { name: "ACE 글로벌반도체TOP4 Plus SOLACTIVE", code: "431310" },
-        { name: "SOL 미국배당다우존스", code: "446720" },
-        { name: "SOL 미국S&P500", code: "433330" },
-        { name: "삼성전자", code: "005930" }, { name: "삼성전자우", code: "005935" },
-        { name: "SK하이닉스", code: "000660" }, { name: "LG에너지솔루션", code: "373220" },
-        { name: "삼성바이오로직스", code: "207940" }, { name: "현대차", code: "005380" },
-        { name: "기아", code: "000270" }, { name: "셀트리온", code: "068270" },
-        { name: "POSCO홀딩스", code: "005490" }, { name: "NAVER", code: "035420" },
-        { name: "카카오", code: "035720" }, { name: "삼성SDI", code: "006400" },
-        { name: "LG화학", code: "051910" }, { name: "삼성물산", code: "028260" },
-        { name: "KB금융", code: "105560" }, { name: "신한지주", code: "055550" },
-        { name: "하나금융지주", code: "086790" }, { name: "메리츠금융지주", code: "138040" },
-        { name: "카카오뱅크", code: "323410" }, { name: "카카오페이", code: "377300" },
-        { name: "HD현대중공업", code: "329180" }, { name: "한화에어로스페이스", code: "012450" },
-        { name: "현대로템", code: "064350" }, { name: "LIG넥스원", code: "079550" },
-        { name: "두산에너빌리티", code: "034020" }, { name: "한국전력", code: "015760" },
-        { name: "에코프로비엠", code: "247540" }, { name: "에코프로", code: "086520" },
-        { name: "에코프로머티", code: "450080" }, { name: "포스코퓨처엠", code: "003670" },
-        { name: "엔켐", code: "348370" }, { name: "알테오젠", code: "196170" },
-        { name: "HLB", code: "028300" }, { name: "리노공업", code: "058470" },
-        { name: "HPSP", code: "403870" }, { name: "클래시스", code: "214150" },
-        { name: "휴젤", code: "145020" }, { name: "삼천당제약", code: "000250" },
-        { name: "실리콘투", code: "257720" }, { name: "크래프톤", code: "259960" },
-        { name: "엔씨소프트", code: "036570" }, { name: "하이브", code: "352820" },
-        { name: "JYP Ent.", code: "035900" }, { name: "SAMG엔터", code: "419530" },
-        { name: "애플 (AAPL)", code: "NAS@AAPL" }, { name: "테슬라 (TSLA)", code: "NAS@TSLA" },
-        { name: "엔비디아 (NVDA)", code: "NAS@NVDA" }, { name: "마이크로소프트 (MSFT)", code: "NAS@MSFT" },
-        { name: "알파벳 A (GOOGL)", code: "NAS@GOOGL" }, { name: "알파벳 C (GOOG)", code: "NAS@GOOG" },
-        { name: "아마존 (AMZN)", code: "NAS@AMZN" }, { name: "메타 (META)", code: "NAS@META" },
-        { name: "브로드컴 (AVGO)", code: "NAS@AVGO" }, { name: "AMD", code: "NAS@AMD" },
-        { name: "TSMC (TSM)", code: "NYS@TSM" }, { name: "ASML", code: "NAS@ASML" },
-        { name: "인텔 (INTC)", code: "NAS@INTC" }, { name: "퀄컴 (QCOM)", code: "NAS@QCOM" },
-        { name: "마이크론 (MU)", code: "NAS@MU" }, { name: "ARM", code: "NAS@ARM" },
-        { name: "일라이 릴리 (LLY)", code: "NYS@LLY" }, { name: "노보 노디스크 (NVO)", code: "NYS@NVO" },
-        { name: "월마트 (WMT)", code: "NYS@WMT" }, { name: "코스트코 (COST)", code: "NAS@COST" },
-        { name: "넷플릭스 (NFLX)", code: "NAS@NFLX" }, { name: "디즈니 (DIS)", code: "NYS@DIS" },
-        { name: "팔란티어 (PLTR)", code: "NYS@PLTR" }, { name: "우버 (UBER)", code: "NYS@UBER" },
-        { name: "로블록스 (RBLX)", code: "NYS@RBLX" }, { name: "유니티 (U)", code: "NYS@U" },
-        { name: "소파이 (SOFI)", code: "NAS@SOFI" }, { name: "로빈후드 (HOOD)", code: "NAS@HOOD" },
-        { name: "코인베이스 (COIN)", code: "NAS@COIN" }, { name: "마이크로스트레티지 (MSTR)", code: "NAS@MSTR" },
-        { name: "아이온큐 (IONQ)", code: "NYS@IONQ" }, { name: "리얼티 인컴 (O)", code: "NYS@O" },
-        { name: "SPY (S&P 500)", code: "NYS@SPY" }, { name: "VOO (S&P 500)", code: "NYS@VOO" },
-        { name: "IVV (S&P 500)", code: "NYS@IVV" }, { name: "QQQ (나스닥 100)", code: "NAS@QQQ" },
-        { name: "TQQQ (나스닥 3배)", code: "NAS@TQQQ" }, { name: "SQQQ (나스닥 인버스 3배)", code: "NAS@SQQQ" },
-        { name: "SOXX (반도체)", code: "NAS@SOXX" }, { name: "SOXL (반도체 3배)", code: "NYS@SOXL" },
-        { name: "SCHD (배당성장)", code: "NYS@SCHD" }, { name: "JEPI (커버드콜)", code: "NYS@JEPI" },
-        { name: "JEPQ (나스닥 커버드콜)", code: "NAS@JEPQ" }, { name: "TLT (20년 장기채)", code: "NAS@TLT" },
-        { name: "ARKK (혁신기업 액티브)", code: "NYS@ARKK" }
+        { name: "삼성전자", code: "005930" },
+        { name: "SK하이닉스", code: "000660" },
+        { name: "테슬라 (TSLA)", code: "NAS@TSLA" },
+        { name: "애플 (AAPL)", code: "NAS@AAPL" },
+        { name: "엔비디아 (NVDA)", code: "NAS@NVDA" },
+        { name: "SCHD (배당성장)", code: "NYS@SCHD" }
     ];
 
-    window.onload = () => {
-        renderList();
-        updateAllPricesOnLoad();
-    };
+    window.onload = () => { renderList(); updateAllPricesOnLoad(); };
 
+    // 종목 검색
     function searchLocalStock(query) {
         const list = document.getElementById('autocompleteList');
         if (!query || query.trim() === '') { list.style.display = 'none'; return; }
-
         const lowerQuery = query.toLowerCase();
-        const results = localStockDB.filter(stock => 
-            stock.name.toLowerCase().includes(lowerQuery) || stock.code.toLowerCase().includes(lowerQuery)
-        );
-
+        const results = localStockDB.filter(s => s.name.toLowerCase().includes(lowerQuery) || s.code.toLowerCase().includes(lowerQuery));
         if (results.length > 0) {
-            list.innerHTML = results.map(item => {
-                const displayCode = item.code.includes('@') ? item.code.split('@')[1] : item.code;
-                return `<div class="autocomplete-item" onclick="selectStock('${item.name}', '${item.code}')">
-                            <span style="font-weight:700; color:white;">${item.name}</span>
-                            <span class="stock-code-tag">${displayCode}</span>
-                        </div>`
-            }).join('');
-        } else {
-            list.innerHTML = `<div class="search-status">목록에 없습니다.<br>종목코드(숫자 또는 영어)를 직접 적어주세요.</div>`;
-        }
-        list.style.display = 'block';
+            list.innerHTML = results.map(item => `<div class="autocomplete-item" onclick="selectStock('${item.name}', '${item.code}')">
+                <span style="color:white; font-weight:700;">${item.name}</span><span class="stock-code-tag">${item.code.split('@').pop()}</span></div>`).join('');
+            list.style.display = 'block';
+        } else { list.style.display = 'none'; }
     }
-
-    function selectStock(name, code) {
-        document.getElementById('sName').value = name;
+    function selectStock(name, code) { 
+        document.getElementById('sName').value = name; 
         document.getElementById('sCode').value = code; 
-        document.getElementById('autocompleteList').style.display = 'none';
+        document.getElementById('autocompleteList').style.display = 'none'; 
     }
 
-    async function fetchWithFallback(targetUrl) {
-        const proxies = [
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
-            `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
-        ];
-        for (let proxy of proxies) {
-            try {
-                const res = await fetch(proxy, { cache: 'no-cache' });
-                if (res.ok) {
-                    const text = await res.text();
-                    return JSON.parse(text);
-                }
-            } catch (e) { console.log("프록시 실패:", proxy); }
-        }
-        throw new Error("차단됨");
-    }
-
+    // 환율 및 시세 가져오기
     async function updateExchangeRate() {
         try {
-            const url = `https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1d&range=1d`;
-            const data = await fetchWithFallback(url);
-            const parsed = data.contents ? JSON.parse(data.contents) : data;
-            if (parsed && parsed.chart && parsed.chart.result && parsed.chart.result.length > 0) {
-                currentExchangeRate = parsed.chart.result[0].meta.regularMarketPrice;
-            }
-        } catch(e) { console.log("환율 업데이트 실패, 기본값 유지"); }
+            const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1d&range=1d')}`);
+            const data = await res.json();
+            currentExchangeRate = data.chart.result[0].meta.regularMarketPrice;
+        } catch(e) { console.log("환율 업데이트 실패"); }
     }
 
     async function getRealTimeData(code) {
-        const ticker = code.includes('@') ? code.split('@')[1] : code;
-        const isUS = /[A-Z]/.test(ticker);
-
+        const isUS = /[a-zA-Z]/.test(code);
+        const ticker = code.split('@').pop();
         if (!isUS) {
-            const url = `https://m.stock.naver.com/api/stock/${ticker}/basic`;
-            const data = await fetchWithFallback(url);
-            const parsed = data.contents ? JSON.parse(data.contents) : data;
-            return {
-                price: parseInt(parsed.closePrice.replace(/,/g, '')),
-                name: parsed.stockName || ticker
-            };
+            const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://m.stock.naver.com/api/stock/'+ticker+'/basic')}`);
+            const data = await res.json();
+            return { price: parseInt(data.closePrice.replace(/,/g, '')), name: data.stockName };
         } else {
-            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
-            const data = await fetchWithFallback(url);
-            const parsed = data.contents ? JSON.parse(data.contents) : data;
-            
-            if (parsed && parsed.chart && parsed.chart.result && parsed.chart.result.length > 0) {
-                const meta = parsed.chart.result[0].meta;
-                return {
-                    price: parseFloat(meta.regularMarketPrice.toFixed(2)),
-                    name: ticker 
-                };
-            } else {
-                throw new Error("미국 주식 시세 파싱 실패");
-            }
+            const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/'+ticker+'?interval=1d&range=1d')}`);
+            const data = await res.json();
+            const meta = data.chart.result[0].meta;
+            return { price: parseFloat(meta.regularMarketPrice.toFixed(2)), name: ticker };
         }
     }
 
     async function updateAllPricesOnLoad() {
-        if(myStocks.length === 0) return;
-        const btn = document.getElementById('refreshBtn');
-        btn.innerText = "⏳ 갱신중";
-        
-        await updateExchangeRate(); 
-        
-        let isUpdated = false;
-        for (let i = 0; i < myStocks.length; i++) {
-            try {
-                const stockData = await getRealTimeData(myStocks[i].code);
-                if(stockData && stockData.price !== myStocks[i].currentPrice) {
-                    myStocks[i].currentPrice = stockData.price;
-                    isUpdated = true;
-                }
-            } catch(e) { console.log("자동 갱신 실패:", myStocks[i].name); }
-        }
-        
-        if(isUpdated) {
-            localStorage.setItem('myStocks', JSON.stringify(myStocks));
-        }
-        renderList(); 
-        btn.innerText = "🔄 갱신";
-    }
-
-    async function addStock() {
-        let name = document.getElementById('sName').value.trim();
-        let codeInput = document.getElementById('sCode').value.trim().toUpperCase(); 
-        const avg = parseFloat(document.getElementById('sAvg').value);
-        const qty = parseFloat(document.getElementById('sQty').value) || 1;
-
-        if(!name && !codeInput) return alert("종목명이나 종목코드 중 하나는 꼭 적어주세요!");
-        if(isNaN(avg)) return alert("평단가를 적어주세요!");
-
-        if(!codeInput && name) {
-            codeInput = name; 
-        }
-
-        const btn = document.getElementById('addBtn');
-        btn.innerText = "정보 확인 중...";
-        btn.disabled = true;
-
-        let currentPrice = 0;
-        const ticker = codeInput.includes('@') ? codeInput.split('@')[1] : codeInput;
-        const isUS = /[A-Z]/.test(ticker); 
-
-        try {
-            const stockData = await getRealTimeData(codeInput);
-            currentPrice = stockData.price;
-            
-            if(!name || name === codeInput) {
-                name = stockData.name;
-            }
-        } catch (e) {
-            if(!name) name = codeInput; 
-            const currSymbol = isUS ? '달러($)' : '원';
-            const manualPrice = prompt(`방화벽으로 인해 가격을 불러오지 못했습니다.\n'${name}'의 현재가를 ${currSymbol} 단위로 직접 적어주세요!`);
-            if(manualPrice) currentPrice = parseFloat(manualPrice.replace(/,/g, ''));
-            else { btn.innerText = "포트폴리오에 저장"; btn.disabled = false; return; }
-        }
-
-        if(isNaN(currentPrice)) currentPrice = avg; 
-
-        myStocks.push({ name, code: codeInput, avgPrice: avg, quantity: qty, currentPrice });
-        localStorage.setItem('myStocks', JSON.stringify(myStocks));
-        renderList();
-        
-        document.getElementById('sName').value = ''; document.getElementById('sCode').value = ''; 
-        document.getElementById('sAvg').value = ''; document.getElementById('sQty').value = '';
-        btn.innerText = "포트폴리오에 저장"; btn.disabled = false;
-    }
-
-    async function refreshAllPrices() {
-        if(myStocks.length === 0) return;
-        document.getElementById('refreshBtn').innerText = "⏳";
-        
-        await updateExchangeRate(); 
-        
-        for (let i = 0; i < myStocks.length; i++) {
-            try {
-                const stockData = await getRealTimeData(myStocks[i].code);
-                myStocks[i].currentPrice = stockData.price;
-            } catch(e) {}
+        await updateExchangeRate();
+        for (let s of myStocks) {
+            try { const d = await getRealTimeData(s.code); s.currentPrice = d.price; } catch(e) {}
         }
         localStorage.setItem('myStocks', JSON.stringify(myStocks));
         renderList();
-        document.getElementById('refreshBtn').innerText = "🔄 갱신";
     }
 
+    // 💡 차트 경로 수정 (미국 주식 안정화)
     function getChartUrl(code, period = 'day') {
         const ts = Date.now();
         const isUS = /[a-zA-Z]/.test(code);
+        const ticker = code.split('@').pop().toUpperCase();
         if (!isUS) {
-            return `https://ssl.pstatic.net/imgfinance/chart/item/candle/${period}/${code}.png?${ts}`;
+            return `https://ssl.pstatic.net/imgfinance/chart/item/candle/${period}/${ticker}.png?${ts}`;
         } else {
-            let chartCode = code.includes('@') ? code : `NAS@${code.toUpperCase()}`;
-            return `https://ssl.pstatic.net/imgfinance/chart/world/candle/${period}/${chartCode}.png?${ts}`;
+            // 네이버 월드 차트의 경우 @ 앞부분을 제거하고 전달해야 정확하게 나옵니다.
+            return `https://ssl.pstatic.net/imgfinance/chart/world/candle/${period}/${ticker}.png?${ts}`;
         }
     }
 
     function toggleChart(idx) { document.getElementById(`chart-${idx}`).classList.toggle('active'); }
-    
     function changePeriod(idx, code, period, btnEl) {
         document.getElementById(`chart-img-${idx}`).src = getChartUrl(code, period);
         document.getElementById(`chart-${idx}`).querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
         btnEl.classList.add('active');
     }
 
+    // 💡 순서 변경 기능
+    function moveStock(idx, direction) {
+        if (idx + direction < 0 || idx + direction >= myStocks.length) return;
+        const target = myStocks.splice(idx, 1)[0];
+        myStocks.splice(idx + direction, 0, target);
+        localStorage.setItem('myStocks', JSON.stringify(myStocks));
+        renderList();
+    }
+
     function renderList() {
         const container = document.getElementById('stockListContainer');
         container.innerHTML = '';
-        
-        if(myStocks.length === 0) { 
-            container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-sub);">등록된 종목이 없습니다.</div>'; 
-            document.getElementById('totalYieldDisplay').innerText = '0.00%'; 
-            document.getElementById('totalYieldDisplay').style.color = 'white'; 
-            document.getElementById('totalInvDisplay').innerText = '0원';
-            document.getElementById('totalPlDisplay').innerText = '0원';
-            document.getElementById('totalPlDisplay').style.color = 'white';
-            document.getElementById('exRateDisplay').innerText = '';
-            return; 
-        }
-        
         let totalInvKRW = 0, totalCurKRW = 0;
-        
+
         myStocks.forEach((s, i) => {
             const isUS = /[a-zA-Z]/.test(s.code);
-            const currSymbol = isUS ? '$' : '원';
-            
-            const itemInvOriginal = s.avgPrice * s.quantity;
-            const itemCurOriginal = s.currentPrice * s.quantity;
-            const itemPLOriginal = itemCurOriginal - itemInvOriginal;
-            
-            if (isUS) {
-                totalInvKRW += (itemInvOriginal * currentExchangeRate);
-                totalCurKRW += (itemCurOriginal * currentExchangeRate);
-            } else {
-                totalInvKRW += itemInvOriginal;
-                totalCurKRW += itemCurOriginal;
-            }
+            const curr = isUS ? '$' : '원';
+            const inv = s.avgPrice * s.quantity;
+            const cur = s.currentPrice * s.quantity;
+            totalInvKRW += isUS ? inv * currentExchangeRate : inv;
+            totalCurKRW += isUS ? cur * currentExchangeRate : cur;
 
-            const pr = (((s.currentPrice - s.avgPrice) / s.avgPrice) * 100).toFixed(2);
-            const color = pr > 0 ? 'var(--red)' : 'var(--blue)';
-            const bg = pr > 0 ? 'rgba(244, 63, 94, 0.15)' : 'rgba(59, 130, 246, 0.15)';
-            const sign = pr > 0 ? '+' : '';
-
-            const priceDisp = isUS ? s.currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2}) + currSymbol : s.currentPrice.toLocaleString() + currSymbol;
-            const avgDisp = isUS ? s.avgPrice.toLocaleString(undefined, {minimumFractionDigits: 2}) + currSymbol : s.avgPrice.toLocaleString() + currSymbol;
-
-            const itemCurDisp = isUS ? itemCurOriginal.toLocaleString(undefined, {minimumFractionDigits: 2}) + currSymbol : Math.floor(itemCurOriginal).toLocaleString() + currSymbol;
-            const itemPLDisp = isUS ? Math.abs(itemPLOriginal).toLocaleString(undefined, {minimumFractionDigits: 2}) + currSymbol : Math.floor(Math.abs(itemPLOriginal)).toLocaleString() + currSymbol;
-            const plSign = itemPLOriginal > 0 ? '+' : (itemPLOriginal < 0 ? '-' : '');
+            const yieldRate = (((s.currentPrice - s.avgPrice) / s.avgPrice) * 100).toFixed(2);
+            const color = yieldRate > 0 ? 'var(--red)' : 'var(--blue)';
 
             container.innerHTML += `
                 <div class="stock-item">
-                    <div style="cursor:pointer;" onclick="toggleChart(${i})">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div>
-                                <div style="font-weight:800; font-size:1.1rem; color:white;">${s.name} <span style="font-size:0.8rem; color:var(--text-sub); font-weight:normal;">▼</span></div>
-                                <div style="font-size:0.85rem; color:var(--text-sub);">평단 ${avgDisp} (x${s.quantity})</div>
-                            </div>
-                            <div style="text-align:right;">
-                                <div style="font-weight:800; color:${color}">${priceDisp}</div>
-                                <div style="font-size:0.85rem; font-weight:700; color:${color}; background:${bg}; padding:3px 8px; border-radius:6px; display:inline-block; margin-top:4px;">${sign}${pr}%</div>
-                            </div>
+                    <div style="display:flex; align-items:center;">
+                        <div class="order-btns">
+                            <button class="order-btn" onclick="moveStock(${i}, -1)">▲</button>
+                            <button class="order-btn" onclick="moveStock(${i}, 1)">▼</button>
                         </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.1); font-size: 0.9rem;">
-                            <div style="color:var(--text-sub);">평가금액: <span style="color:white; font-weight:bold;">${itemCurDisp}</span></div>
-                            <div style="color:var(--text-sub);">평가손익: <span style="color:${color}; font-weight:bold;">${plSign}${itemPLDisp}</span></div>
+                        <div style="flex:1; cursor:pointer;" onclick="toggleChart(${i})">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <div style="font-weight:800; font-size:1.05rem; color:white;">${s.name}</div>
+                                    <div style="font-size:0.8rem; color:var(--text-sub);">평단 ${s.avgPrice}${curr} (x${s.quantity})</div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-weight:800; color:${color}">${s.currentPrice}${curr}</div>
+                                    <div style="font-size:0.8rem; font-weight:700; color:${color}">${yieldRate}%</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="chart-dropdown" id="chart-${i}">
-                        <div class="period-selector">
+                        <div class="period-selector" style="margin-top:10px;">
                             <button class="period-btn active" onclick="changePeriod(${i}, '${s.code}', 'day', this); event.stopPropagation();">일봉</button>
                             <button class="period-btn" onclick="changePeriod(${i}, '${s.code}', 'week', this); event.stopPropagation();">주봉</button>
                             <button class="period-btn" onclick="changePeriod(${i}, '${s.code}', 'month', this); event.stopPropagation();">월봉</button>
                         </div>
                         <img src="${getChartUrl(s.code, 'day')}" class="chart-img" id="chart-img-${i}">
                         <div class="actions">
-                            <button class="action-btn" style="background:rgba(16, 185, 129, 0.15); color:#34d399;" onclick="openWater(${i}); event.stopPropagation();">💧 물타기</button>
-                            <button class="action-btn" style="background:rgba(99, 102, 241, 0.15); color:#818cf8;" onclick="openA(${i}); event.stopPropagation();">수정/진단🔍</button>
-                            <button class="action-btn" style="background:rgba(255, 255, 255, 0.05); color:var(--text-sub);" onclick="delStock(${i}); event.stopPropagation();">삭제</button>
+                            <button class="action-btn" style="background:rgba(16, 185, 129, 0.15); color:#34d399;" onclick="openWater(${i})">💧 물타기</button>
+                            <button class="action-btn" style="background:rgba(99, 102, 241, 0.15); color:#818cf8;" onclick="openA(${i})">🔍 진단</button>
+                            <button class="action-btn" style="background:rgba(255, 255, 255, 0.05); color:var(--text-sub);" onclick="delStock(${i})">삭제</button>
                         </div>
                     </div>
                 </div>`;
         });
-        
-        const totalPr = (((totalCurKRW - totalInvKRW) / totalInvKRW) * 100).toFixed(2);
-        document.getElementById('totalYieldDisplay').innerText = `${totalPr > 0 ? '+' : ''}${totalPr}%`;
-        document.getElementById('totalYieldDisplay').style.color = totalPr > 0 ? 'var(--red)' : 'var(--blue)';
 
-        const totalPLAmountKRW = totalCurKRW - totalInvKRW;
+        const totalPr = (((totalCurKRW - totalInvKRW) / totalInvKRW) * 100).toFixed(2);
+        document.getElementById('totalYieldDisplay').innerText = totalPr + '%';
+        document.getElementById('totalYieldDisplay').style.color = totalPr > 0 ? 'var(--red)' : 'var(--blue)';
         document.getElementById('totalInvDisplay').innerText = Math.floor(totalInvKRW).toLocaleString() + "원";
-        document.getElementById('totalPlDisplay').innerText = `${totalPLAmountKRW > 0 ? '+' : ''}${Math.floor(totalPLAmountKRW).toLocaleString()}원`;
-        document.getElementById('totalPlDisplay').style.color = totalPLAmountKRW > 0 ? 'var(--red)' : 'var(--blue)';
+        document.getElementById('totalPlDisplay').innerText = Math.floor(totalCurKRW - totalInvKRW).toLocaleString() + "원";
+        document.getElementById('totalPlDisplay').style.color = (totalCurKRW - totalInvKRW) > 0 ? 'var(--red)' : 'var(--blue)';
+        document.getElementById('exRateDisplay').innerText = `(환율: ${currentExchangeRate.toFixed(1)})`;
+    }
+
+    async function addStock() {
+        const name = document.getElementById('sName').value;
+        const code = document.getElementById('sCode').value;
+        const avg = parseFloat(document.getElementById('sAvg').value);
+        const qty = parseFloat(document.getElementById('sQty').value) || 1;
+        if (!code || !avg) return alert("필수 정보를 입력하세요!");
         
-        document.getElementById('exRateDisplay').innerText = `(적용환율: ${currentExchangeRate.toLocaleString(undefined, {maximumFractionDigits:1})}원)`;
+        try {
+            const data = await getRealTimeData(code);
+            myStocks.push({ name: name || data.name, code, avgPrice: avg, quantity: qty, currentPrice: data.price });
+            localStorage.setItem('myStocks', JSON.stringify(myStocks));
+            renderList();
+        } catch(e) { alert("종목 추가 실패!"); }
     }
 
     function delStock(idx) { if(confirm("삭제하시겠습니까?")) { myStocks.splice(idx, 1); localStorage.setItem('myStocks', JSON.stringify(myStocks)); renderList(); } }
     function closeModals() { document.querySelectorAll('.modal, .modal-overlay').forEach(m => m.style.display = 'none'); }
-
     function openA(i) {
         curIdx = i; const s = myStocks[i];
         document.getElementById('aTitle').innerText = s.name;
-        document.getElementById('aSubtitle').innerText = `수익률: ${(((s.currentPrice-s.avgPrice)/s.avgPrice)*100).toFixed(2)}%`;
-        
-        document.getElementById('uCode').value = s.code.includes('@') ? s.code.split('@')[1] : s.code; 
-        document.getElementById('uAvg').value = s.avgPrice; 
-        document.getElementById('uQty').value = s.quantity; 
+        document.getElementById('uCode').value = s.code;
+        document.getElementById('uAvg').value = s.avgPrice;
+        document.getElementById('uQty').value = s.quantity;
         document.getElementById('uPrice').value = s.currentPrice;
-        
         document.getElementById('overlay').style.display = 'block'; document.getElementById('aModal').style.display = 'block';
     }
-
     function updatePrice() {
-        const uCode = document.getElementById('uCode').value.toUpperCase();
-        if(/[A-Z]/.test(uCode) && !uCode.includes('@')) {
-            myStocks[curIdx].code = `NAS@${uCode}`;
-        } else {
-            myStocks[curIdx].code = uCode;
-        }
-        
-        myStocks[curIdx].avgPrice = parseFloat(document.getElementById('uAvg').value) || myStocks[curIdx].avgPrice;
-        myStocks[curIdx].quantity = parseFloat(document.getElementById('uQty').value) || myStocks[curIdx].quantity;
-        myStocks[curIdx].currentPrice = parseFloat(document.getElementById('uPrice').value) || myStocks[curIdx].currentPrice;
-        
-        localStorage.setItem('myStocks', JSON.stringify(myStocks)); 
-        renderList(); 
-        closeModals();
+        myStocks[curIdx].code = document.getElementById('uCode').value;
+        myStocks[curIdx].avgPrice = parseFloat(document.getElementById('uAvg').value);
+        myStocks[curIdx].quantity = parseFloat(document.getElementById('uQty').value);
+        myStocks[curIdx].currentPrice = parseFloat(document.getElementById('uPrice').value);
+        localStorage.setItem('myStocks', JSON.stringify(myStocks)); renderList(); closeModals();
     }
-
     function askGemini() {
         const s = myStocks[curIdx];
-        const isUS = /[a-zA-Z]/.test(s.code);
-        const curr = isUS ? '달러' : '원';
-        
-        const txt = `전문 애널리스트로서 현재 보유 중인 [${s.name}] 주식에 대한 심층 분석 리포트를 작성해 줘.
-
-[나의 투자 현황]
-- 매수 평단가: ${s.avgPrice}${curr}
-- 보유 수량: ${s.quantity}주
-- 현재 주가: ${s.currentPrice}${curr}
-
-위 현황을 바탕으로 다음 4가지 관점을 종합하여 상세한 전망과 맞춤형 대응 전략을 분석해 줘:
-1. 거시 경제: 현재 글로벌 및 한국의 경제 상황(금리, 인플레이션 등)이 이 종목에 미치는 영향
-2. 정치/국제 정세: 주요 국가의 정책이나 지정학적 리스크가 미치는 영향
-3. 산업 트렌드: 이 기업이 속한 섹터의 최신 시장 트렌드와 미래 전망
-4. 맞춤형 전략: 내 평단가와 수익률 상황을 고려했을 때의 구체적인 대응 전략 (추가 매수, 홀딩, 부분 매도 등)과 목표가/손절가 제시
-
-최대한 논리적이고 가독성 좋게, 실제 증권사 리포트처럼 작성해 줘.`;
-
-        navigator.clipboard.writeText(txt).then(() => { 
-            alert("✨ 심층 분석용 전문가 프롬프트가 복사되었습니다!\\n\\nGemini 채팅창에 그대로 붙여넣기 하시면 엄청난 리포트가 나올 거예요."); 
-            window.open('https://gemini.google.com/', '_blank'); 
-        });
+        const txt = `전문 애널리스트로서 [${s.name}] 주식 분석 리포트를 써줘.\n평단가: ${s.avgPrice}, 현재가: ${s.currentPrice}\n수익률상황에 맞는 대응전략 제시 요망.`;
+        navigator.clipboard.writeText(txt).then(() => { alert("AI 분석 질문 복사됨!"); window.open('https://gemini.google.com/', '_blank'); });
     }
-
-    function openWater(i) {
-        curIdx = i; const s = myStocks[i];
-        const isUS = /[a-zA-Z]/.test(s.code);
-        const curr = isUS ? '$' : '원';
-        const priceDisp = isUS ? s.currentPrice.toLocaleString(undefined, {minimumFractionDigits: 2}) : s.currentPrice.toLocaleString();
-        document.getElementById('wDesc').innerText = `${s.name} (현재가: ${priceDisp}${curr})`;
-        document.getElementById('addMoney').placeholder = `추가 투자할 금액 (${curr})`;
-        document.getElementById('overlay').style.display = 'block'; document.getElementById('waterModal').style.display = 'block';
-    }
-
+    function openWater(i) { curIdx = i; document.getElementById('wDesc').innerText = myStocks[i].name; document.getElementById('overlay').style.display = 'block'; document.getElementById('waterModal').style.display = 'block'; }
     function calcWater() {
         const money = parseFloat(document.getElementById('addMoney').value); const s = myStocks[curIdx];
-        if(!money) return document.getElementById('wResult').style.display = 'none';
-        const isUS = /[a-zA-Z]/.test(s.code);
-        const curr = isUS ? '$' : '원';
-
+        if(!money) return;
         const addQty = Math.floor(money / s.currentPrice);
         const newAvg = (s.avgPrice * s.quantity + addQty * s.currentPrice) / (s.quantity + addQty);
-        const newAvgDisp = isUS ? newAvg.toFixed(2) : Math.floor(newAvg).toLocaleString();
-
-        document.getElementById('wNewAvg').innerText = `${newAvgDisp}${curr}`;
-        document.getElementById('wBuyQty').innerText = `✅ ${addQty.toLocaleString()}주 추가 매수 가능`;
+        document.getElementById('wNewAvg').innerText = newAvg.toFixed(2);
+        document.getElementById('wBuyQty').innerText = addQty + "주 매수 가능";
         document.getElementById('wResult').style.display = 'block';
+    }
+    async function refreshAllPrices() {
+        document.getElementById('refreshBtn').innerText = "⏳";
+        await updateAllPricesOnLoad();
+        document.getElementById('refreshBtn').innerText = "🔄 갱신";
     }
 </script>
 </body>
 </html>
-
-
