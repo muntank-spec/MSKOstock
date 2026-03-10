@@ -10,7 +10,8 @@
     <meta name="apple-mobile-web-app-title" content="주식비서">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#0b0f19">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2933/2933116.png">
+    
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%23151b2b%22/><text y=%2254%22 x=%2250%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-size=%2250%22>📈</text></svg>">
 
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -148,7 +149,12 @@
 </div>
 
 <script>
-    let myStocks = JSON.parse(localStorage.getItem('myStocks')) || [];
+    // 💡 초기 실행 시 빈 화면이 되지 않도록 샘플 포트폴리오 자동 세팅!
+    let myStocks = JSON.parse(localStorage.getItem('myStocks')) || [
+        { name: "SAMG엔터", code: "419530", avgPrice: 15000, quantity: 100, currentPrice: 15000 },
+        { name: "TIME 미국나스닥100액티브", code: "426030", avgPrice: 10000, quantity: 50, currentPrice: 10000 },
+        { name: "SCHD (배당성장)", code: "NYS@SCHD", avgPrice: 75, quantity: 10, currentPrice: 75 }
+    ];
     let curIdx = -1;
     let currentExchangeRate = 1330;
 
@@ -550,13 +556,11 @@
         closeModals();
     }
 
-    // 💡 AI 분석 프롬프트 초강력 업그레이드!
     function askGemini() {
         const s = myStocks[curIdx];
         const isUS = /[a-zA-Z]/.test(s.code);
         const curr = isUS ? '달러' : '원';
         
-        // 거시 경제, 정치, 트렌드를 모두 포함하는 전문가 수준의 분석 요청
         const txt = `전문 애널리스트로서 현재 보유 중인 [${s.name}] 주식에 대한 심층 분석 리포트를 작성해 줘.
 
 [나의 투자 현황]
