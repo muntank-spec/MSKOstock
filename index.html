@@ -10,8 +10,6 @@
     <meta name="apple-mobile-web-app-title" content="주식비서">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#0b0f19">
-    
-   <link rel="apple-touch-icon" href="stock-icon.svg?v=4">
 
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
@@ -149,7 +147,32 @@
 </div>
 
 <script>
-    // 💡 초기 실행 시 빈 화면이 되지 않도록 샘플 포트폴리오 자동 세팅!
+    // 💡 1. 사파리용 완벽한 정사각형 PNG 아이콘 자동 생성 마법!
+    (function createAppleIcon() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 180; 
+        canvas.height = 180;
+        const ctx = canvas.getContext('2d');
+        
+        // 짙은 남색 배경을 투명한 곳 없이 꽉 채움 (검은 모서리 완벽 차단!)
+        ctx.fillStyle = '#151b2b';
+        ctx.fillRect(0, 0, 180, 180);
+        
+        // 우상향 차트 이모지 그리기
+        ctx.font = '100px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('📈', 90, 100);
+        
+        // 진짜 PNG 파일로 변환해서 헤더에 몰래 쏙!
+        const link = document.createElement('link');
+        link.rel = 'apple-touch-icon';
+        link.href = canvas.toDataURL('image/png');
+        document.head.appendChild(link);
+    })();
+
+
+    // 💡 2. 초기 실행 시 빈 화면이 되지 않도록 샘플 포트폴리오 자동 세팅!
     let myStocks = JSON.parse(localStorage.getItem('myStocks')) || [
         { name: "SAMG엔터", code: "419530", avgPrice: 15000, quantity: 100, currentPrice: 15000 },
         { name: "TIME 미국나스닥100액티브", code: "426030", avgPrice: 10000, quantity: 50, currentPrice: 10000 },
@@ -609,5 +632,3 @@
 </script>
 </body>
 </html>
-
-
