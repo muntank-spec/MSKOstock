@@ -45,7 +45,6 @@
 
         .stock-item { background: rgba(255,255,255,0.02); border-radius: 18px; padding: 18px; margin-bottom: 12px; border: 1px solid var(--border); }
         
-        /* 순서 조절 버튼 스타일 */
         .order-btns { display: flex; flex-direction: column; gap: 4px; margin-right: 12px; }
         .order-btn { background: #1e2536; border: none; color: var(--text-sub); width: 24px; height: 24px; border-radius: 4px; font-size: 10px; cursor: pointer; }
 
@@ -132,14 +131,14 @@
         </div>
     </div>
     
-    <button onclick="askGemini()" class="btn-main" style="margin-bottom: 10px;">✨ AI 정밀 진단 복사</button>
+    <button onclick="askGemini()" class="btn-main" style="margin-bottom: 10px;">✨ AI 정밀 진단 앱으로 열기</button>
     <button onclick="closeModals()" style="width:100%; padding:14px; background:transparent; border:none; color:var(--text-sub); font-weight:bold;">닫기</button>
 </div>
 
 <div class="modal" id="waterModal">
     <h3 style="color:white; font-size: 1.3rem; margin-bottom: 5px;">💧 물타기 계산</h3>
     <p style="color:var(--text-sub); font-size:0.85rem; margin-bottom:20px;" id="wDesc"></p>
-    <input type="number" id="addMoney" placeholder="추가 투자할 금액" style="margin-bottom: 15px;" oninput="calcWater()">
+    <input type="number" id="addMoney" placeholder="추가 투자할 금액 (국내:원 / 해외:달러)" style="margin-bottom: 15px;" oninput="calcWater()">
     <div id="wResult" style="display:none; text-align:center; padding: 15px; background: var(--bg-color); border-radius: 12px; border: 1px solid var(--green); margin-bottom: 15px;">
         <span style="color:var(--text-sub); font-size:0.85rem;">예상 평단가</span><br>
         <span style="color:var(--green); font-size:1.6rem; font-weight:900;" id="wNewAvg"></span>
@@ -149,7 +148,6 @@
 </div>
 
 <script>
-    // 💡 1. 아이콘 생성 (기존 유지)
     (function createAppleIcon() {
         const canvas = document.createElement('canvas');
         canvas.width = 180; canvas.height = 180;
@@ -174,7 +172,6 @@
     let curIdx = -1;
     let currentExchangeRate = 1350;
 
-    // 종목 DB (기본 데이터)
     const localStockDB = [
         { name: "TIME 미국나스닥100액티브", code: "426030" },
         { name: "TIME 미국S&P500액티브", code: "426020" },
@@ -189,7 +186,6 @@
 
     window.onload = () => { renderList(); updateAllPricesOnLoad(); };
 
-    // 종목 검색
     function searchLocalStock(query) {
         const list = document.getElementById('autocompleteList');
         if (!query || query.trim() === '') { list.style.display = 'none'; return; }
@@ -207,7 +203,6 @@
         document.getElementById('autocompleteList').style.display = 'none'; 
     }
 
-    // 환율 및 시세 가져오기
     async function updateExchangeRate() {
         try {
             const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1d&range=1d')}`);
@@ -240,16 +235,19 @@
         renderList();
     }
 
-    // 💡 차트 경로 수정 (미국 주식 안정화)
+    // 💡 해외주식 차트 이미지 수정 (Finviz 활용)
     function getChartUrl(code, period = 'day') {
         const ts = Date.now();
         const isUS = /[a-zA-Z]/.test(code);
         const ticker = code.split('@').pop().toUpperCase();
+        
         if (!isUS) {
             return `https://ssl.pstatic.net/imgfinance/chart/item/candle/${period}/${ticker}.png?${ts}`;
         } else {
-            // 네이버 월드 차트의 경우 @ 앞부분을 제거하고 전달해야 정확하게 나옵니다.
-            return `https://ssl.pstatic.net/imgfinance/chart/world/candle/${period}/${ticker}.png?${ts}`;
+            let p = 'd';
+            if (period === 'week') p = 'w';
+            if (period === 'month') p = 'm';
+            return `https://finviz.com/chart.ashx?t=${ticker}&ty=c&ta=0&p=${p}&_=${ts}`;
         }
     }
 
@@ -260,7 +258,6 @@
         btnEl.classList.add('active');
     }
 
-    // 💡 순서 변경 기능
     function moveStock(idx, direction) {
         if (idx + direction < 0 || idx + direction >= myStocks.length) return;
         const target = myStocks.splice(idx, 1)[0];
@@ -296,10 +293,10 @@
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <div>
                                     <div style="font-weight:800; font-size:1.05rem; color:white;">${s.name}</div>
-                                    <div style="font-size:0.8rem; color:var(--text-sub);">평단 ${s.avgPrice}${curr} (x${s.quantity})</div>
+                                    <div style="font-size:0.8rem; color:var(--text-sub);">평단 ${s.avgPrice.toLocaleString('en-US')}${curr} (x${s.quantity})</div>
                                 </div>
                                 <div style="text-align:right;">
-                                    <div style="font-weight:800; color:${color}">${s.currentPrice}${curr}</div>
+                                    <div style="font-weight:800; color:${color}">${s.currentPrice.toLocaleString('en-US')}${curr}</div>
                                     <div style="font-size:0.8rem; font-weight:700; color:${color}">${yieldRate}%</div>
                                 </div>
                             </div>
@@ -311,7 +308,7 @@
                             <button class="period-btn" onclick="changePeriod(${i}, '${s.code}', 'week', this); event.stopPropagation();">주봉</button>
                             <button class="period-btn" onclick="changePeriod(${i}, '${s.code}', 'month', this); event.stopPropagation();">월봉</button>
                         </div>
-                        <img src="${getChartUrl(s.code, 'day')}" class="chart-img" id="chart-img-${i}">
+                        <img src="${getChartUrl(s.code, 'day')}" class="chart-img" id="chart-img-${i}" onerror="this.src='https://dummyimage.com/600x400/151b2b/818cf8.png&text=Chart+Loading...'">
                         <div class="actions">
                             <button class="action-btn" style="background:rgba(16, 185, 129, 0.15); color:#34d399;" onclick="openWater(${i})">💧 물타기</button>
                             <button class="action-btn" style="background:rgba(99, 102, 241, 0.15); color:#818cf8;" onclick="openA(${i})">🔍 진단</button>
@@ -363,18 +360,32 @@
         myStocks[curIdx].currentPrice = parseFloat(document.getElementById('uPrice').value);
         localStorage.setItem('myStocks', JSON.stringify(myStocks)); renderList(); closeModals();
     }
+    
+    // 💡 제미나이 앱 호출을 위한 딥링크 연동 로직
     function askGemini() {
         const s = myStocks[curIdx];
-        const txt = `전문 애널리스트로서 [${s.name}] 주식 분석 리포트를 써줘.\n평단가: ${s.avgPrice}, 현재가: ${s.currentPrice}\n수익률상황에 맞는 대응전략 제시 요망.`;
-        navigator.clipboard.writeText(txt).then(() => { alert("AI 분석 질문 복사됨!"); window.open('https://gemini.google.com/', '_blank'); });
+        const txt = `전문 애널리스트로서 [${s.name}] 현 국제 정치와 경제 흐름을 감안한 주식 분석 리포트를 써줘.\n평단가: ${s.avgPrice}, 현재가: ${s.currentPrice}\n수익률상황에 맞는 대응전략 제시 요망.`;
+        
+        navigator.clipboard.writeText(txt).then(() => { 
+            alert("✨ AI 분석 질문 복사완료!\n앱이 열리면 '붙여넣기' 하세요.");
+            
+            // 폰에 설치된 구글 앱 강제 호출 시도
+            window.location.href = 'googleapp://';
+            
+            // 만약 앱이 열리지 않을 경우를 대비해 1초 뒤 사파리(웹)로 제미나이 연결
+            setTimeout(() => {
+                window.open('https://gemini.google.com/', '_blank');
+            }, 1000);
+        });
     }
+
     function openWater(i) { curIdx = i; document.getElementById('wDesc').innerText = myStocks[i].name; document.getElementById('overlay').style.display = 'block'; document.getElementById('waterModal').style.display = 'block'; }
     function calcWater() {
         const money = parseFloat(document.getElementById('addMoney').value); const s = myStocks[curIdx];
         if(!money) return;
         const addQty = Math.floor(money / s.currentPrice);
         const newAvg = (s.avgPrice * s.quantity + addQty * s.currentPrice) / (s.quantity + addQty);
-        document.getElementById('wNewAvg').innerText = newAvg.toFixed(2);
+        document.getElementById('wNewAvg').innerText = newAvg.toLocaleString('en-US', {maximumFractionDigits: 2});
         document.getElementById('wBuyQty').innerText = addQty + "주 매수 가능";
         document.getElementById('wResult').style.display = 'block';
     }
