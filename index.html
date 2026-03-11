@@ -211,31 +211,46 @@
         } catch(e) { console.log("환율 업데이트 실패"); }
     }
 
+    // 💡 네이버와 야후에서 전일비(change), 등락률(changeRate) 데이터 추가 추출
     async function getRealTimeData(code) {
         const isUS = /[a-zA-Z]/.test(code);
         const ticker = code.split('@').pop();
         if (!isUS) {
             const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://m.stock.naver.com/api/stock/'+ticker+'/basic')}`);
             const data = await res.json();
-            return { price: parseInt(data.closePrice.replace(/,/g, '')), name: data.stockName };
+            const price = parseInt(data.closePrice.replace(/,/g, ''));
+            let sign = 1;
+            if(data.compareToPreviousPrice && data.compareToPreviousPrice.code === '5') sign = -1; // 5는 하락
+            const change = data.compareToPreviousClosePrice ? parseInt(data.compareToPreviousClosePrice.replace(/,/g, '')) * sign : 0;
+            const changeRate = data.fluctuationsRatio ? parseFloat(data.fluctuationsRatio) * sign : 0;
+            return { price, name: data.stockName, change, changeRate };
         } else {
-            const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/'+ticker+'?interval=1d&range=1d')}`);
+            // 야후 파이낸스는 최근 2일치 데이터를 불러와 전일 종가를 계산
+            const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/'+ticker+'?interval=1d&range=2d')}`);
             const data = await res.json();
             const meta = data.chart.result[0].meta;
-            return { price: parseFloat(meta.regularMarketPrice.toFixed(2)), name: ticker };
+            const price = parseFloat(meta.regularMarketPrice.toFixed(2));
+            const prevClose = parseFloat(meta.chartPreviousClose.toFixed(2));
+            const change = parseFloat((price - prevClose).toFixed(2));
+            const changeRate = parseFloat(((change / prevClose) * 100).toFixed(2));
+            return { price, name: ticker, change, changeRate };
         }
     }
 
     async function updateAllPricesOnLoad() {
         await updateExchangeRate();
         for (let s of myStocks) {
-            try { const d = await getRealTimeData(s.code); s.currentPrice = d.price; } catch(e) {}
+            try { 
+                const d = await getRealTimeData(s.code); 
+                s.currentPrice = d.price;
+                s.change = d.change;
+                s.changeRate = d.changeRate;
+            } catch(e) {}
         }
         localStorage.setItem('myStocks', JSON.stringify(myStocks));
         renderList();
     }
 
-    // 💡 해외주식 차트 이미지 수정 (Finviz 활용)
     function getChartUrl(code, period = 'day') {
         const ts = Date.now();
         const isUS = /[a-zA-Z]/.test(code);
@@ -281,6 +296,15 @@
 
             const yieldRate = (((s.currentPrice - s.avgPrice) / s.avgPrice) * 100).toFixed(2);
             const color = yieldRate > 0 ? 'var(--red)' : 'var(--blue)';
+            
+            // 💡 전일대비 등락률 시각화 처리
+            const cVal = s.change || 0;
+            const cRate = s.changeRate || 0;
+            const dodColor = cVal > 0 ? 'var(--red)' : (cVal < 0 ? 'var(--blue)' : 'var(--text-sub)');
+            const dodSign = cVal > 0 ? '▲' : (cVal < 0 ? '▼' : '-');
+            const dodAbs = Math.abs(cVal).toLocaleString('en-US');
+            const dodRate = Math.abs(cRate).toFixed(2);
+            const dodHtml = `<div style="font-size:0.8rem; font-weight:700; color:${dodColor}; margin-top:3px;">${dodSign} ${dodAbs} (${dodRate}%)</div>`;
 
             container.innerHTML += `
                 <div class="stock-item">
@@ -296,10 +320,12 @@
                                     <div style="font-size:0.8rem; color:var(--text-sub);">평단 ${s.avgPrice.toLocaleString('en-US')}${curr} (x${s.quantity})</div>
                                 </div>
                                 <div style="text-align:right;">
-                                    <div style="font-weight:800; color:${color}">${s.currentPrice.toLocaleString('en-US')}${curr}</div>
-                                    <div style="font-size:0.8rem; font-weight:700; color:${color}">${yieldRate}%</div>
+                                    <div style="font-weight:800; font-size:1.1rem; color:${color}">${s.currentPrice.toLocaleString('en-US')}${curr}</div>
+                                    ${dodHtml}
                                 </div>
                             </div>
+                            <div style="text-align:right; margin-top:5px; font-size:0.85rem; font-weight:700; color:${color}; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:6px; display:inline-block; float:right;">수익률 ${yieldRate}%</div>
+                            <div style="clear:both;"></div>
                         </div>
                     </div>
                     <div class="chart-dropdown" id="chart-${i}">
@@ -336,7 +362,7 @@
         
         try {
             const data = await getRealTimeData(code);
-            myStocks.push({ name: name || data.name, code, avgPrice: avg, quantity: qty, currentPrice: data.price });
+            myStocks.push({ name: name || data.name, code, avgPrice: avg, quantity: qty, currentPrice: data.price, change: data.change, changeRate: data.changeRate });
             localStorage.setItem('myStocks', JSON.stringify(myStocks));
             renderList();
         } catch(e) { alert("종목 추가 실패!"); }
@@ -361,21 +387,15 @@
         localStorage.setItem('myStocks', JSON.stringify(myStocks)); renderList(); closeModals();
     }
     
-    // 💡 제미나이 앱 호출을 위한 딥링크 연동 로직
+    // 💡 제미나이 웹 주소로 쏴서 아이폰이 앱을 가로채서 열도록 유도 (Universal Link)
     function askGemini() {
         const s = myStocks[curIdx];
-        const txt = `전문 애널리스트로서 [${s.name}] 현 국제 정치와 경제 흐름을 감안한 주식 분석 리포트를 써줘.\n평단가: ${s.avgPrice}, 현재가: ${s.currentPrice}\n수익률상황에 맞는 대응전략 제시 요망.`;
+        const txt = `전문 애널리스트로서 [${s.name}] 주식 분석 리포트를 써줘.\n평단가: ${s.avgPrice}, 현재가: ${s.currentPrice}\n수익률상황에 맞는 대응전략 제시 요망.`;
         
         navigator.clipboard.writeText(txt).then(() => { 
-            alert("✨ AI 분석 질문 복사완료!\n앱이 열리면 '붙여넣기' 하세요.");
-            
-            // 폰에 설치된 구글 앱 강제 호출 시도
-            window.location.href = 'googleapp://';
-            
-            // 만약 앱이 열리지 않을 경우를 대비해 1초 뒤 사파리(웹)로 제미나이 연결
-            setTimeout(() => {
-                window.open('https://gemini.google.com/', '_blank');
-            }, 1000);
+            alert("✨ AI 분석 질문 복사완료!\n제미나이 화면이 열리면 '붙여넣기' 하세요.");
+            // iOS가 이 주소를 인식하고 제미나이 앱이 설치되어 있으면 자동으로 앱을 엽니다.
+            window.location.href = 'https://gemini.google.com/';
         });
     }
 
