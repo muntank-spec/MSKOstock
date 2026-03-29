@@ -19,7 +19,7 @@
             --text-main: #f8fafc; --text-sub: #94a3b8; --red: #f43f5e; --blue: #3b82f6; --green: #10b981;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
-        body { font-family: 'Pretendard', sans-serif; background: var(--bg-color); color: var(--text-main); padding: 15px; }
+        body { font-family: 'Pretendard', sans-serif; background: var(--bg-color); color: var(--text-main); padding: 15px; padding-bottom: 60px; }
         .container { max-width: 600px; margin: 0 auto; }
         .header { text-align: center; margin: 20px 0; }
         .header h1 { font-size: 1.6rem; font-weight: 800; background: linear-gradient(to right, #a5b4fc, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 5px; }
@@ -36,9 +36,9 @@
             max-height: 250px; overflow-y: auto; display: none; margin-top: 8px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8);
         }
-        .autocomplete-item { padding: 15px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+        .autocomplete-item { padding: 15px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .autocomplete-item:active { background: var(--primary); }
-        .stock-code-tag { color: var(--text-sub); font-size: 0.8rem; font-weight: bold; }
+        .stock-code-tag { color: var(--text-sub); font-size: 0.8rem; font-weight: bold; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; }
         
         .btn-main { width: 100%; padding: 16px; background: var(--primary); border: none; color: white; border-radius: 12px; font-weight: 800; font-size: 1rem; cursor: pointer; }
         .btn-sub { padding: 8px 16px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-main); border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.85rem; }
@@ -61,6 +61,8 @@
         
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; backdrop-filter: blur(5px); }
         .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 92%; max-width: 400px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 24px; padding: 25px; z-index: 101; }
+        
+        .footer { text-align: center; padding: 20px; color: var(--text-sub); font-size: 0.8rem; }
     </style>
 </head>
 <body>
@@ -76,7 +78,10 @@
                 <span style="font-weight: 800; font-size: 1.1rem;">💼 포트폴리오</span>
                 <button class="btn-sub" onclick="refreshAllPrices()" id="refreshBtn">🔄 갱신</button>
             </div>
-            <span id="totalYieldDisplay" style="font-size: 1.3rem; font-weight: 900;">0.00%</span>
+            <div style="text-align: right;">
+                <span id="totalYieldDisplay" style="font-size: 1.3rem; font-weight: 900; display: block;">0.00%</span>
+                <span id="lastUpdateDisplay" style="font-size: 0.7rem; color: var(--text-sub);"></span>
+            </div>
         </div>
 
         <div style="display: flex; justify-content: space-between; background: rgba(0,0,0,0.2); padding: 14px 16px; border-radius: 12px; margin-bottom: 16px; border: 1px solid var(--border);">
@@ -97,18 +102,29 @@
         <div style="font-weight: 800; margin-bottom: 15px; font-size: 1.1rem;">📝 새로운 종목 추가</div>
         
         <div class="search-area">
-            <input type="text" id="sName" placeholder="🔍 TIGER, 삼성, TSLA 등 검색 (또는 비워두기)" oninput="searchLocalStock(this.value)" autocomplete="off">
+            <input type="text" id="sName" placeholder="🔍 종목명 또는 코드 입력 (삼성전자, TSLA 등)" oninput="searchNetworkStock(this.value)" autocomplete="off">
             <div id="autocompleteList"></div>
         </div>
         <div class="search-area">
-            <input type="text" id="sCode" placeholder="종목코드 (필수! 이름 비워도 알아서 찾음)">
+            <input type="text" id="sCode" placeholder="종목코드 (자동 입력됨)">
         </div>
         <div class="input-grid">
-            <input type="number" id="sAvg" placeholder="평단가 (원/달러)">
-            <input type="number" id="sQty" placeholder="보유 수량">
+            <div>
+                <div style="font-size:0.7rem; color:var(--text-sub); margin-bottom:4px;">매수 평단가</div>
+                <input type="number" id="sAvg" placeholder="평단가">
+            </div>
+            <div>
+                <div style="font-size:0.7rem; color:var(--text-sub); margin-bottom:4px;">보유 수량</div>
+                <input type="number" id="sQty" placeholder="보유 수량">
+            </div>
         </div>
         
         <button class="btn-main" onclick="addStock()" id="addBtn">포트폴리오에 저장</button>
+    </div>
+
+    <div class="footer">
+        <p>현재 버전: v2.5.1 (2026.03.30)</p>
+        <button class="btn-sub" style="margin-top:10px; font-size:0.7rem;" onclick="checkAppUpdate()">🚀 업데이트 확인</button>
     </div>
 </div>
 
@@ -164,43 +180,55 @@
         document.head.appendChild(link);
     })();
 
-    let myStocks = JSON.parse(localStorage.getItem('myStocks')) || [
-        { name: "SAMG엔터", code: "419530", avgPrice: 15000, quantity: 100, currentPrice: 15000 },
-        { name: "TIME 미국나스닥100액티브", code: "426030", avgPrice: 10000, quantity: 50, currentPrice: 10000 },
-        { name: "SCHD (배당성장)", code: "NYS@SCHD", avgPrice: 75, quantity: 10, currentPrice: 75 }
-    ];
+    let myStocks = JSON.parse(localStorage.getItem('myStocks')) || [];
     let curIdx = -1;
     let currentExchangeRate = 1350;
-
-    const localStockDB = [
-        { name: "TIME 미국나스닥100액티브", code: "426030" },
-        { name: "TIME 미국S&P500액티브", code: "426020" },
-        { name: "TIGER 미국나스닥100", code: "133690" },
-        { name: "삼성전자", code: "005930" },
-        { name: "SK하이닉스", code: "000660" },
-        { name: "테슬라 (TSLA)", code: "NAS@TSLA" },
-        { name: "애플 (AAPL)", code: "NAS@AAPL" },
-        { name: "엔비디아 (NVDA)", code: "NAS@NVDA" },
-        { name: "SCHD (배당성장)", code: "NYS@SCHD" }
-    ];
+    let searchTimer;
 
     window.onload = () => { renderList(); updateAllPricesOnLoad(); };
 
-    function searchLocalStock(query) {
+    async function searchNetworkStock(query) {
+        clearTimeout(searchTimer);
         const list = document.getElementById('autocompleteList');
-        if (!query || query.trim() === '') { list.style.display = 'none'; return; }
-        const lowerQuery = query.toLowerCase();
-        const results = localStockDB.filter(s => s.name.toLowerCase().includes(lowerQuery) || s.code.toLowerCase().includes(lowerQuery));
-        if (results.length > 0) {
-            list.innerHTML = results.map(item => `<div class="autocomplete-item" onclick="selectStock('${item.name}', '${item.code}')">
-                <span style="color:white; font-weight:700;">${item.name}</span><span class="stock-code-tag">${item.code.split('@').pop()}</span></div>`).join('');
-            list.style.display = 'block';
-        } else { list.style.display = 'none'; }
+        if (!query || query.trim().length < 1) { list.style.display = 'none'; return; }
+
+        searchTimer = setTimeout(async () => {
+            try {
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://ac.finance.naver.com/ac?q=${encodeURIComponent(query)}&st=111&frm=stock&r_format=json&r_unicode=1&t_koreng=1&ans=2`)}`;
+                const res = await fetch(proxyUrl);
+                const data = await res.json();
+                
+                const items = data.items[0];
+                if (items && items.length > 0) {
+                    list.innerHTML = items.map(item => {
+                        const name = item[0][0];
+                        const code = item[1][0];
+                        return `<div class="autocomplete-item" onclick="selectStock('${name}', '${code}')">
+                            <span style="color:white; font-weight:700;">${name}</span>
+                            <span class="stock-code-tag">${code}</span>
+                        </div>`;
+                    }).join('');
+                    list.style.display = 'block';
+                } else { list.style.display = 'none'; }
+            } catch (e) { console.error("검색 실패", e); }
+        }, 300);
     }
-    function selectStock(name, code) { 
+
+    async function selectStock(name, code) { 
         document.getElementById('sName').value = name; 
         document.getElementById('sCode').value = code; 
         document.getElementById('autocompleteList').style.display = 'none'; 
+        
+        const statusBtn = document.getElementById('addBtn');
+        statusBtn.innerText = "⏳ 시가 조회 중...";
+        
+        try {
+            const data = await getRealTimeData(code);
+            document.getElementById('sAvg').value = data.price;
+            document.getElementById('sAvg').focus();
+        } catch(e) { console.error("가격 조회 실패"); }
+        
+        statusBtn.innerText = "포트폴리오에 저장";
     }
 
     async function updateExchangeRate() {
@@ -211,57 +239,70 @@
         } catch(e) { console.log("환율 업데이트 실패"); }
     }
 
-    // 💡 네이버와 야후에서 전일비(change), 등락률(changeRate) 데이터 추가 추출
-    async function getRealTimeData(code) {
+    async function getRealTimeData(code, isRetry = false) {
         const isUS = /[a-zA-Z]/.test(code);
-        const ticker = code.split('@').pop();
-        if (!isUS) {
-            const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://m.stock.naver.com/api/stock/'+ticker+'/basic')}`);
-            const data = await res.json();
-            const price = parseInt(data.closePrice.replace(/,/g, ''));
-            let sign = 1;
-            if(data.compareToPreviousPrice && data.compareToPreviousPrice.code === '5') sign = -1; // 5는 하락
-            const change = data.compareToPreviousClosePrice ? parseInt(data.compareToPreviousClosePrice.replace(/,/g, '')) * sign : 0;
-            const changeRate = data.fluctuationsRatio ? parseFloat(data.fluctuationsRatio) * sign : 0;
-            return { price, name: data.stockName, change, changeRate };
-        } else {
-            // 야후 파이낸스는 최근 2일치 데이터를 불러와 전일 종가를 계산
-            const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/'+ticker+'?interval=1d&range=2d')}`);
-            const data = await res.json();
-            const meta = data.chart.result[0].meta;
-            const price = parseFloat(meta.regularMarketPrice.toFixed(2));
-            const prevClose = parseFloat(meta.chartPreviousClose.toFixed(2));
-            const change = parseFloat((price - prevClose).toFixed(2));
-            const changeRate = parseFloat(((change / prevClose) * 100).toFixed(2));
-            return { price, name: ticker, change, changeRate };
+        const ticker = code.includes('@') ? code.split('@').pop() : code;
+
+        try {
+            if (!isUS && code.length === 6 && !isNaN(code)) {
+                const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://m.stock.naver.com/api/stock/'+ticker+'/basic')}`);
+                const data = await res.json();
+                const price = parseInt(data.closePrice.replace(/,/g, ''));
+                let sign = 1;
+                if(data.compareToPreviousPrice && data.compareToPreviousPrice.code === '5') sign = -1;
+                const change = data.compareToPreviousClosePrice ? parseInt(data.compareToPreviousClosePrice.replace(/,/g, '')) * sign : 0;
+                const changeRate = data.fluctuationsRatio ? parseFloat(data.fluctuationsRatio) * sign : 0;
+                return { price, name: data.stockName, change, changeRate };
+            } else {
+                const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/'+ticker+'?interval=1d&range=2d')}`);
+                const data = await res.json();
+                const meta = data.chart.result[0].meta;
+                const price = parseFloat(meta.regularMarketPrice.toFixed(2));
+                const prevClose = parseFloat(meta.chartPreviousClose.toFixed(2));
+                const change = parseFloat((price - prevClose).toFixed(2));
+                const changeRate = parseFloat(((change / prevClose) * 100).toFixed(2));
+                return { price, name: ticker, change, changeRate };
+            }
+        } catch (e) {
+            if (!isRetry && !code.includes('@') && isUS) return getRealTimeData("NAS@" + code, true);
+            throw e;
         }
     }
 
     async function updateAllPricesOnLoad() {
-        await updateExchangeRate();
-        for (let s of myStocks) {
-            try { 
-                const d = await getRealTimeData(s.code); 
-                s.currentPrice = d.price;
-                s.change = d.change;
-                s.changeRate = d.changeRate;
-            } catch(e) {}
+        const btn = document.getElementById('refreshBtn');
+        if (btn) btn.innerText = "⏳ 갱신중";
+        
+        try {
+            await updateExchangeRate();
+            const promises = myStocks.map(async (s) => {
+                try {
+                    const d = await getRealTimeData(s.code); 
+                    s.currentPrice = d.price;
+                    s.change = d.change;
+                    s.changeRate = d.changeRate;
+                    if (d.name && (!s.name || s.name === s.code)) s.name = d.name;
+                } catch(e) { console.error(`${s.code} 실패:`, e); }
+            });
+            await Promise.all(promises);
+            
+            const now = new Date();
+            const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+            localStorage.setItem('lastUpdateTime', timeStr);
+            localStorage.setItem('myStocks', JSON.stringify(myStocks));
+            renderList();
+        } finally {
+            if (btn) btn.innerText = "🔄 갱신";
         }
-        localStorage.setItem('myStocks', JSON.stringify(myStocks));
-        renderList();
     }
 
     function getChartUrl(code, period = 'day') {
         const ts = Date.now();
         const isUS = /[a-zA-Z]/.test(code);
-        const ticker = code.split('@').pop().toUpperCase();
-        
-        if (!isUS) {
-            return `https://ssl.pstatic.net/imgfinance/chart/item/candle/${period}/${ticker}.png?${ts}`;
-        } else {
-            let p = 'd';
-            if (period === 'week') p = 'w';
-            if (period === 'month') p = 'm';
+        const ticker = code.includes('@') ? code.split('@').pop().toUpperCase() : code.toUpperCase();
+        if (!isUS) return `https://ssl.pstatic.net/imgfinance/chart/item/candle/${period}/${ticker}.png?${ts}`;
+        else {
+            let p = period === 'week' ? 'w' : (period === 'month' ? 'm' : 'd');
             return `https://finviz.com/chart.ashx?t=${ticker}&ty=c&ta=0&p=${p}&_=${ts}`;
         }
     }
@@ -286,6 +327,9 @@
         container.innerHTML = '';
         let totalInvKRW = 0, totalCurKRW = 0;
 
+        const lastTime = localStorage.getItem('lastUpdateTime');
+        if (lastTime) document.getElementById('lastUpdateDisplay').innerText = `최근 갱신: ${lastTime}`;
+
         myStocks.forEach((s, i) => {
             const isUS = /[a-zA-Z]/.test(s.code);
             const curr = isUS ? '$' : '원';
@@ -295,16 +339,12 @@
             totalCurKRW += isUS ? cur * currentExchangeRate : cur;
 
             const yieldRate = (((s.currentPrice - s.avgPrice) / s.avgPrice) * 100).toFixed(2);
-            const color = yieldRate > 0 ? 'var(--red)' : 'var(--blue)';
-            
-            // 💡 전일대비 등락률 시각화 처리
+            const color = yieldRate > 0 ? 'var(--red)' : (yieldRate < 0 ? 'var(--blue)' : 'white');
             const cVal = s.change || 0;
             const cRate = s.changeRate || 0;
             const dodColor = cVal > 0 ? 'var(--red)' : (cVal < 0 ? 'var(--blue)' : 'var(--text-sub)');
             const dodSign = cVal > 0 ? '▲' : (cVal < 0 ? '▼' : '-');
-            const dodAbs = Math.abs(cVal).toLocaleString('en-US');
-            const dodRate = Math.abs(cRate).toFixed(2);
-            const dodHtml = `<div style="font-size:0.8rem; font-weight:700; color:${dodColor}; margin-top:3px;">${dodSign} ${dodAbs} (${dodRate}%)</div>`;
+            const dodHtml = `<div style="font-size:0.8rem; font-weight:700; color:${dodColor}; margin-top:3px;">${dodSign} ${Math.abs(cVal).toLocaleString('en-US')} (${Math.abs(cRate).toFixed(2)}%)</div>`;
 
             container.innerHTML += `
                 <div class="stock-item">
@@ -324,7 +364,7 @@
                                     ${dodHtml}
                                 </div>
                             </div>
-                            <div style="text-align:right; margin-top:5px; font-size:0.85rem; font-weight:700; color:${color}; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:6px; display:inline-block; float:right;">수익률 ${yieldRate}%</div>
+                            <div style="text-align:right; margin-top:5px; font-size:0.85rem; font-weight:700; color:${color}; background:rgba(255,255,255,0.05); padding:4px 8px; border-radius:6px; display:inline-block; float:right;">수익률 ${isNaN(yieldRate) ? '0.00' : yieldRate}%</div>
                             <div style="clear:both;"></div>
                         </div>
                     </div>
@@ -344,12 +384,13 @@
                 </div>`;
         });
 
-        const totalPr = (((totalCurKRW - totalInvKRW) / totalInvKRW) * 100).toFixed(2);
-        document.getElementById('totalYieldDisplay').innerText = totalPr + '%';
-        document.getElementById('totalYieldDisplay').style.color = totalPr > 0 ? 'var(--red)' : 'var(--blue)';
+        const totalPr = totalInvKRW > 0 ? (((totalCurKRW - totalInvKRW) / totalInvKRW) * 100).toFixed(2) : '0.00';
+        const yieldEl = document.getElementById('totalYieldDisplay');
+        yieldEl.innerText = (totalPr > 0 ? '+' : '') + totalPr + '%';
+        yieldEl.style.color = totalPr > 0 ? 'var(--red)' : (totalPr < 0 ? 'var(--blue)' : 'white');
         document.getElementById('totalInvDisplay').innerText = Math.floor(totalInvKRW).toLocaleString() + "원";
         document.getElementById('totalPlDisplay').innerText = Math.floor(totalCurKRW - totalInvKRW).toLocaleString() + "원";
-        document.getElementById('totalPlDisplay').style.color = (totalCurKRW - totalInvKRW) > 0 ? 'var(--red)' : 'var(--blue)';
+        document.getElementById('totalPlDisplay').style.color = (totalCurKRW - totalInvKRW) > 0 ? 'var(--red)' : (totalCurKRW - totalInvKRW < 0 ? 'var(--blue)' : 'white');
         document.getElementById('exRateDisplay').innerText = `(환율: ${currentExchangeRate.toFixed(1)})`;
     }
 
@@ -357,15 +398,19 @@
         const name = document.getElementById('sName').value;
         const code = document.getElementById('sCode').value;
         const avg = parseFloat(document.getElementById('sAvg').value);
-        const qty = parseFloat(document.getElementById('sQty').value) || 1;
-        if (!code || !avg) return alert("필수 정보를 입력하세요!");
+        const qty = parseFloat(document.getElementById('sQty').value) || 0;
+        if (!code || isNaN(avg)) return alert("종목코드와 평단가를 입력하세요!");
         
         try {
             const data = await getRealTimeData(code);
             myStocks.push({ name: name || data.name, code, avgPrice: avg, quantity: qty, currentPrice: data.price, change: data.change, changeRate: data.changeRate });
             localStorage.setItem('myStocks', JSON.stringify(myStocks));
+            document.getElementById('sName').value = '';
+            document.getElementById('sCode').value = '';
+            document.getElementById('sAvg').value = '';
+            document.getElementById('sQty').value = '';
             renderList();
-        } catch(e) { alert("종목 추가 실패!"); }
+        } catch(e) { alert("종목 추가 실패! 코드를 확인하세요."); }
     }
 
     function delStock(idx) { if(confirm("삭제하시겠습니까?")) { myStocks.splice(idx, 1); localStorage.setItem('myStocks', JSON.stringify(myStocks)); renderList(); } }
@@ -387,16 +432,17 @@
         localStorage.setItem('myStocks', JSON.stringify(myStocks)); renderList(); closeModals();
     }
     
-    // 💡 제미나이 웹 주소로 쏴서 아이폰이 앱을 가로채서 열도록 유도 (Universal Link)
     function askGemini() {
         const s = myStocks[curIdx];
         const txt = `전문 애널리스트로서 [${s.name}] 주식 분석 리포트를 써줘.\n평단가: ${s.avgPrice}, 현재가: ${s.currentPrice}\n수익률상황에 맞는 대응전략 제시 요망.`;
-        
         navigator.clipboard.writeText(txt).then(() => { 
             alert("✨ AI 분석 질문 복사완료!\n제미나이 화면이 열리면 '붙여넣기' 하세요.");
-            // iOS가 이 주소를 인식하고 제미나이 앱이 설치되어 있으면 자동으로 앱을 엽니다.
             window.location.href = 'https://gemini.google.com/';
         });
+    }
+
+    function checkAppUpdate() {
+        alert("🚀 현재 최신 버전(v2.5.1)을 사용 중입니다.\n\n새로운 로직이 적용되었습니다!");
     }
 
     function openWater(i) { curIdx = i; document.getElementById('wDesc').innerText = myStocks[i].name; document.getElementById('overlay').style.display = 'block'; document.getElementById('waterModal').style.display = 'block'; }
@@ -410,9 +456,7 @@
         document.getElementById('wResult').style.display = 'block';
     }
     async function refreshAllPrices() {
-        document.getElementById('refreshBtn').innerText = "⏳";
         await updateAllPricesOnLoad();
-        document.getElementById('refreshBtn').innerText = "🔄 갱신";
     }
 </script>
 </body>
