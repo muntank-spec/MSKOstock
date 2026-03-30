@@ -102,7 +102,7 @@
         <div style="font-weight: 800; margin-bottom: 15px; font-size: 1.1rem;">📝 새로운 종목 추가</div>
         
         <div class="search-area">
-            <input type="text" id="sName" placeholder="🔍 종목명 또는 코드 입력 (삼성전자, TSLA 등)" oninput="searchNetworkStock(this.value)" autocomplete="off">
+            <input type="text" id="sName" placeholder="🔍 종목명 또는 코드 입력 (쿠팡, 테슬라 등)" oninput="searchNetworkStock(this.value)" autocomplete="off">
             <div id="autocompleteList"></div>
         </div>
         <div class="search-area">
@@ -123,7 +123,7 @@
     </div>
 
     <div class="footer">
-        <p>현재 버전: v2.5.1 (2026.03.30)</p>
+        <p>현재 버전: v3.5.0 (2026.03.30)</p>
         <button class="btn-sub" style="margin-top:10px; font-size:0.7rem;" onclick="checkAppUpdate()">🚀 업데이트 확인</button>
     </div>
 </div>
@@ -185,6 +185,56 @@
     let currentExchangeRate = 1350;
     let searchTimer;
 
+    // 💡 쿠팡, 스벅 등 한글 검색 지원을 위해 오프라인 DB 대폭 강화!
+    const TOP_STOCKS = [
+        {n:"삼성전자", c:"005930", nat:"🇰🇷"}, {n:"SK하이닉스", c:"000660", nat:"🇰🇷"}, {n:"현대차", c:"005380", nat:"🇰🇷"}, {n:"기아", c:"000270", nat:"🇰🇷"}, 
+        {n:"NAVER", c:"035420", nat:"🇰🇷"}, {n:"카카오", c:"035720", nat:"🇰🇷"}, {n:"셀트리온", c:"068270", nat:"🇰🇷"}, {n:"LG에너지솔루션", c:"373220", nat:"🇰🇷"}, 
+        {n:"POSCO홀딩스", c:"005490", nat:"🇰🇷"}, {n:"에코프로", c:"086520", nat:"🇰🇷"}, {n:"에코프로비엠", c:"247540", nat:"🇰🇷"}, 
+        {n:"애플", c:"AAPL", nat:"🇺🇸"}, {n:"Apple", c:"AAPL", nat:"🇺🇸"}, {n:"테슬라", c:"TSLA", nat:"🇺🇸"}, {n:"Tesla", c:"TSLA", nat:"🇺🇸"}, 
+        {n:"마이크로소프트", c:"MSFT", nat:"🇺🇸"}, {n:"엔비디아", c:"NVDA", nat:"🇺🇸"}, {n:"NVIDIA", c:"NVDA", nat:"🇺🇸"}, {n:"알파벳", c:"GOOGL", nat:"🇺🇸"}, 
+        {n:"구글", c:"GOOGL", nat:"🇺🇸"}, {n:"아마존", c:"AMZN", nat:"🇺🇸"}, {n:"메타", c:"META", nat:"🇺🇸"}, {n:"넷플릭스", c:"NFLX", nat:"🇺🇸"}, 
+        {n:"팔란티어", c:"PLTR", nat:"🇺🇸"}, {n:"AMD", c:"AMD", nat:"🇺🇸"}, {n:"TSMC", c:"TSM", nat:"🇺🇸"}, {n:"브로드컴", c:"AVGO", nat:"🇺🇸"}, 
+        {n:"인텔", c:"INTC", nat:"🇺🇸"}, {n:"퀄컴", c:"QCOM", nat:"🇺🇸"}, {n:"일라이릴리", c:"LLY", nat:"🇺🇸"}, {n:"코인베이스", c:"COIN", nat:"🇺🇸"}, 
+        {n:"SCHD", c:"SCHD", nat:"🇺🇸"}, {n:"QQQ", c:"QQQ", nat:"🇺🇸"}, {n:"SPY", c:"SPY", nat:"🇺🇸"}, {n:"VOO", c:"VOO", nat:"🇺🇸"}, 
+        {n:"TQQQ", c:"TQQQ", nat:"🇺🇸"}, {n:"SOXX", c:"SOXX", nat:"🇺🇸"}, {n:"SOXL", c:"SOXL", nat:"🇺🇸"},
+        // 👇 추가된 해외(한글) 주식들
+        {n:"쿠팡", c:"CPNG", nat:"🇺🇸"}, {n:"Coupang", c:"CPNG", nat:"🇺🇸"},
+        {n:"스타벅스", c:"SBUX", nat:"🇺🇸"}, {n:"코카콜라", c:"KO", nat:"🇺🇸"},
+        {n:"디즈니", c:"DIS", nat:"🇺🇸"}, {n:"보잉", c:"BA", nat:"🇺🇸"},
+        {n:"리비안", c:"RIVN", nat:"🇺🇸"}, {n:"루시드", c:"LCID", nat:"🇺🇸"},
+        {n:"아이온큐", c:"IONQ", nat:"🇺🇸"}, {n:"유니티", c:"U", nat:"🇺🇸"},
+        {n:"로블록스", c:"RBLX", nat:"🇺🇸"}, {n:"ASML", c:"ASML", nat:"🇺🇸"}, 
+        {n:"에이에스엠엘", c:"ASML", nat:"🇺🇸"}, {n:"ARM", c:"ARM", nat:"🇺🇸"},
+        {n:"마이크론", c:"MU", nat:"🇺🇸"}, {n:"나이키", c:"NKE", nat:"🇺🇸"}
+    ];
+
+    async function fetchWithFallback(url) {
+        const proxies = [
+            `https://api.codetabs.com/v1/proxy/?quest=${url}`,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+            `https://corsproxy.io/?${encodeURIComponent(url)}`
+        ];
+        
+        let lastError;
+        for (let proxy of proxies) {
+            try {
+                const res = await fetch(proxy, { cache: 'no-store' });
+                if (res.ok) return await res.json();
+            } catch(e) { lastError = e; console.log("프록시 우회 중..."); }
+        }
+        throw lastError; 
+    }
+
+    const fetchNaverDomestic = (query) => new Promise((resolve) => {
+        const cbName = 'naverSearchCb_' + Date.now();
+        window[cbName] = (data) => { resolve(data.items[0]); delete window[cbName]; };
+        const script = document.createElement('script');
+        script.src = `https://ac.finance.naver.com/ac?q=${encodeURIComponent(query)}&st=111&frm=stock&r_format=json&r_unicode=1&t_koreng=1&ans=2&_callback=${cbName}`;
+        script.onerror = () => resolve([]);
+        document.head.appendChild(script);
+        setTimeout(() => resolve([]), 1500);
+    });
+
     window.onload = () => { renderList(); updateAllPricesOnLoad(); };
 
     async function searchNetworkStock(query) {
@@ -192,25 +242,66 @@
         const list = document.getElementById('autocompleteList');
         if (!query || query.trim().length < 1) { list.style.display = 'none'; return; }
 
+        list.innerHTML = '<div style="padding: 15px; color: var(--text-sub); text-align: center;">글로벌 마켓 검색 중... 🔍</div>';
+        list.style.display = 'block';
+
         searchTimer = setTimeout(async () => {
+            let html = '';
+            const addedCodes = new Set(); 
+
+            // ⭐ 1단계: 내장 오프라인 DB 검색 (쿠팡, 스벅 등 한글 완벽 대응!)
+            const localResults = TOP_STOCKS.filter(s => s.n.toLowerCase().includes(query.toLowerCase()) || s.c.toLowerCase().includes(query.toLowerCase()));
+            localResults.forEach(s => {
+                html += `<div class="autocomplete-item" onclick="selectStock('${s.n}', '${s.c}')">
+                    <span style="color:white; font-weight:700;">${s.nat} ${s.n}</span>
+                    <span class="stock-code-tag">${s.c}</span>
+                </div>`;
+                addedCodes.add(s.c);
+            });
+            
+            if (html) list.innerHTML = html;
+
+            // ⭐ 2단계: 네이버 국내 주식 라이브 검색
             try {
-                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://ac.finance.naver.com/ac?q=${encodeURIComponent(query)}&st=111&frm=stock&r_format=json&r_unicode=1&t_koreng=1&ans=2`)}`;
-                const res = await fetch(proxyUrl);
-                const data = await res.json();
-                
-                const items = data.items[0];
-                if (items && items.length > 0) {
-                    list.innerHTML = items.map(item => {
-                        const name = item[0][0];
-                        const code = item[1][0];
-                        return `<div class="autocomplete-item" onclick="selectStock('${name}', '${code}')">
-                            <span style="color:white; font-weight:700;">${name}</span>
-                            <span class="stock-code-tag">${code}</span>
-                        </div>`;
-                    }).join('');
-                    list.style.display = 'block';
-                } else { list.style.display = 'none'; }
-            } catch (e) { console.error("검색 실패", e); }
+                const naverItems = await fetchNaverDomestic(query);
+                if (naverItems && naverItems.length > 0) {
+                    naverItems.forEach(item => {
+                        const name = Array.isArray(item[0]) ? item[0][0] : item[0];
+                        const code = Array.isArray(item[1]) ? item[1][0] : item[1];
+                        if (!addedCodes.has(code)) {
+                            html += `<div class="autocomplete-item" onclick="selectStock('${name}', '${code}')">
+                                <span style="color:white; font-weight:700;">🇰🇷 ${name}</span>
+                                <span class="stock-code-tag">${code}</span>
+                            </div>`;
+                            addedCodes.add(code);
+                        }
+                    });
+                }
+            } catch(e) {}
+
+            // ⭐ 3단계: 야후 해외 주식 라이브 검색
+            try {
+                const yahooUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=4`;
+                const data = await fetchWithFallback(yahooUrl);
+                if (data.quotes && data.quotes.length > 0) {
+                    data.quotes.forEach(q => {
+                        if ((q.quoteType === 'EQUITY' || q.quoteType === 'ETF') && !q.symbol.includes('.KS') && !q.symbol.includes('.KQ') && !addedCodes.has(q.symbol)) {
+                            const name = q.shortname || q.longname || q.symbol;
+                            html += `<div class="autocomplete-item" onclick="selectStock('${name.replace(/'/g, "\\'")}', '${q.symbol}')">
+                                <span style="color:white; font-weight:700;">🇺🇸 ${name}</span>
+                                <span class="stock-code-tag">${q.symbol}</span>
+                            </div>`;
+                            addedCodes.add(q.symbol);
+                        }
+                    });
+                }
+            } catch(e) {}
+
+            if (html) {
+                list.innerHTML = html;
+            } else {
+                list.innerHTML = '<div style="padding: 15px; color: var(--text-sub); text-align: center; line-height: 1.5;">결과가 없습니다 🥲</div>';
+            }
         }, 300);
     }
 
@@ -226,36 +317,43 @@
             const data = await getRealTimeData(code);
             document.getElementById('sAvg').value = data.price;
             document.getElementById('sAvg').focus();
-        } catch(e) { console.error("가격 조회 실패"); }
+        } catch(e) { 
+            console.error("가격 조회 실패");
+            alert("⚠️ 현재 해당 종목의 실시간 가격을 불러오기 어렵습니다. 평단가를 직접 입력해 주세요.");
+            document.getElementById('sAvg').focus();
+        }
         
         statusBtn.innerText = "포트폴리오에 저장";
     }
 
     async function updateExchangeRate() {
         try {
-            const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1d&range=1d')}`);
-            const data = await res.json();
+            const data = await fetchWithFallback('https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1d&range=1d');
             currentExchangeRate = data.chart.result[0].meta.regularMarketPrice;
         } catch(e) { console.log("환율 업데이트 실패"); }
     }
 
     async function getRealTimeData(code, isRetry = false) {
-        const isUS = /[a-zA-Z]/.test(code);
+        const isKoreaTicker = /^\d{6}$/.test(code);
         const ticker = code.includes('@') ? code.split('@').pop() : code;
 
         try {
-            if (!isUS && code.length === 6 && !isNaN(code)) {
-                const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://m.stock.naver.com/api/stock/'+ticker+'/basic')}`);
-                const data = await res.json();
+            if (isKoreaTicker && code.length === 6) {
+                const data = await fetchWithFallback('https://m.stock.naver.com/api/stock/'+ticker+'/basic');
                 const price = parseInt(data.closePrice.replace(/,/g, ''));
+                
                 let sign = 1;
                 if(data.compareToPreviousPrice && data.compareToPreviousPrice.code === '5') sign = -1;
-                const change = data.compareToPreviousClosePrice ? parseInt(data.compareToPreviousClosePrice.replace(/,/g, '')) * sign : 0;
-                const changeRate = data.fluctuationsRatio ? parseFloat(data.fluctuationsRatio) * sign : 0;
+                
+                const parsedChange = data.compareToPreviousClosePrice ? parseInt(data.compareToPreviousClosePrice.replace(/,/g, '')) : 0;
+                const change = Math.abs(parsedChange) * sign;
+                
+                const parsedRate = data.fluctuationsRatio ? parseFloat(data.fluctuationsRatio.replace(/,/g, '')) : 0;
+                const changeRate = Math.abs(parsedRate) * sign;
+
                 return { price, name: data.stockName, change, changeRate };
             } else {
-                const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/'+ticker+'?interval=1d&range=2d')}`);
-                const data = await res.json();
+                const data = await fetchWithFallback('https://query1.finance.yahoo.com/v8/finance/chart/'+ticker+'?interval=1d&range=2d');
                 const meta = data.chart.result[0].meta;
                 const price = parseFloat(meta.regularMarketPrice.toFixed(2));
                 const prevClose = parseFloat(meta.chartPreviousClose.toFixed(2));
@@ -264,7 +362,7 @@
                 return { price, name: ticker, change, changeRate };
             }
         } catch (e) {
-            if (!isRetry && !code.includes('@') && isUS) return getRealTimeData("NAS@" + code, true);
+            if (!isRetry && !code.includes('@') && !isKoreaTicker) return getRealTimeData("NAS@" + code, true);
             throw e;
         }
     }
@@ -298,10 +396,15 @@
 
     function getChartUrl(code, period = 'day') {
         const ts = Date.now();
-        const isUS = /[a-zA-Z]/.test(code);
-        const ticker = code.includes('@') ? code.split('@').pop().toUpperCase() : code.toUpperCase();
-        if (!isUS) return `https://ssl.pstatic.net/imgfinance/chart/item/candle/${period}/${ticker}.png?${ts}`;
-        else {
+        const isKorea = /^\d{6}$/.test(code) || code.endsWith('.KS') || code.endsWith('.KQ');
+        let ticker = code;
+        if (code.includes('@')) ticker = code.split('@').pop();
+        ticker = ticker.toUpperCase();
+
+        if (isKorea) {
+            const cleanTicker = ticker.replace('.KS', '').replace('.KQ', '');
+            return `https://ssl.pstatic.net/imgfinance/chart/item/candle/${period}/${cleanTicker}.png?${ts}`;
+        } else {
             let p = period === 'week' ? 'w' : (period === 'month' ? 'm' : 'd');
             return `https://finviz.com/chart.ashx?t=${ticker}&ty=c&ta=0&p=${p}&_=${ts}`;
         }
@@ -331,20 +434,26 @@
         if (lastTime) document.getElementById('lastUpdateDisplay').innerText = `최근 갱신: ${lastTime}`;
 
         myStocks.forEach((s, i) => {
-            const isUS = /[a-zA-Z]/.test(s.code);
-            const curr = isUS ? '$' : '원';
+            const isKorea = /^\d{6}$/.test(s.code) || s.code.endsWith('.KS') || s.code.endsWith('.KQ');
+            const curr = isKorea ? '원' : '$';
+            
             const inv = s.avgPrice * s.quantity;
             const cur = s.currentPrice * s.quantity;
-            totalInvKRW += isUS ? inv * currentExchangeRate : inv;
-            totalCurKRW += isUS ? cur * currentExchangeRate : cur;
+            totalInvKRW += isKorea ? inv : inv * currentExchangeRate;
+            totalCurKRW += isKorea ? cur : cur * currentExchangeRate;
 
             const yieldRate = (((s.currentPrice - s.avgPrice) / s.avgPrice) * 100).toFixed(2);
             const color = yieldRate > 0 ? 'var(--red)' : (yieldRate < 0 ? 'var(--blue)' : 'white');
+            
             const cVal = s.change || 0;
             const cRate = s.changeRate || 0;
             const dodColor = cVal > 0 ? 'var(--red)' : (cVal < 0 ? 'var(--blue)' : 'var(--text-sub)');
             const dodSign = cVal > 0 ? '▲' : (cVal < 0 ? '▼' : '-');
-            const dodHtml = `<div style="font-size:0.8rem; font-weight:700; color:${dodColor}; margin-top:3px;">${dodSign} ${Math.abs(cVal).toLocaleString('en-US')} (${Math.abs(cRate).toFixed(2)}%)</div>`;
+            
+            const cValStr = cVal > 0 ? `+${cVal.toLocaleString('en-US')}` : cVal.toLocaleString('en-US');
+            const cRateStr = cRate > 0 ? `+${cRate.toFixed(2)}` : cRate.toFixed(2);
+            
+            const dodHtml = `<div style="font-size:0.8rem; font-weight:700; color:${dodColor}; margin-top:3px;">${dodSign} ${cValStr} (${cRateStr}%)</div>`;
 
             container.innerHTML += `
                 <div class="stock-item">
@@ -442,7 +551,7 @@
     }
 
     function checkAppUpdate() {
-        alert("🚀 현재 최신 버전(v2.5.1)을 사용 중입니다.\n\n새로운 로직이 적용되었습니다!");
+        alert("🚀 현재 최신 버전(v3.5.0)을 사용 중입니다.\n\n쿠팡, 스벅 등 인기 해외주식 한글 검색 패치가 적용되었습니다!");
     }
 
     function openWater(i) { curIdx = i; document.getElementById('wDesc').innerText = myStocks[i].name; document.getElementById('overlay').style.display = 'block'; document.getElementById('waterModal').style.display = 'block'; }
