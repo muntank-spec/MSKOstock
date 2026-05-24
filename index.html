@@ -14,13 +14,14 @@
 
         /* ── 디자인 토큰 ── */
         :root {
-            --bg: #0b0f19;
-            --card: #151b2b;
-            --card2: #1a2133;
+            --bg: #060913;
+            --card: rgba(21, 27, 43, 0.75);
+            --card2: rgba(26, 33, 51, 0.85);
             --primary: #4f46e5;
             --primary-h: #6366f1;
-            --border: #262f45;
-            --border2: #303d5a;
+            --primary-glow: rgba(99, 102, 241, 0.25);
+            --border: rgba(255, 255, 255, 0.08);
+            --border2: rgba(255, 255, 255, 0.15);
             --text: #f8fafc;
             --text-sub: #94a3b8;
             --text-dim: #4a5568;
@@ -35,10 +36,11 @@
 
         body {
             font-family: 'Pretendard', -apple-system, sans-serif;
-            background: var(--bg);
+            background: radial-gradient(circle at top right, #0f162a, var(--bg));
             color: var(--text);
             padding: 16px;
             padding-bottom: 72px;
+            min-height: 100vh;
         }
 
         .container { max-width: 600px; margin: 0 auto; }
@@ -46,10 +48,11 @@
         /* ── 헤더 ── */
         .header { text-align: center; margin: 24px 0 20px; }
         .header h1 {
-            font-size: 1.55rem; font-weight: 800;
-            background: linear-gradient(135deg, #a5b4fc, #818cf8, #6366f1);
+            font-size: 1.65rem; font-weight: 900;
+            background: linear-gradient(135deg, #c7d2fe, #818cf8, #4f46e5);
             -webkit-background-clip: text; background-clip: text;
             -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
             margin-bottom: 6px;
         }
         .header p { color: var(--text-sub); font-size: 0.82rem; }
@@ -57,10 +60,17 @@
         /* ── 공통 카드 ── */
         .card {
             background: var(--card);
-            padding: 20px;
-            border-radius: 20px;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 22px;
+            border-radius: 24px;
             margin-bottom: 18px;
             border: 1px solid var(--border);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 0 rgba(255,255,255,0.05);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .card:hover {
+            box-shadow: 0 14px 40px rgba(0,0,0,0.45), inset 0 1px 0 0 rgba(255,255,255,0.08);
         }
 
         /* ── 요약 바 ── */
@@ -82,114 +92,181 @@
         /* ── 입력 폼 ── */
         .search-wrap { position: relative; margin-bottom: 10px; }
         input[type=text], input[type=number] {
-            width: 100%; background: #1e2536; border: 1px solid var(--border);
-            color: var(--text); padding: 14px 16px; border-radius: 12px;
-            font-size: 0.95rem; outline: none; font-family: inherit;
-            transition: border-color .2s;
+            width: 100%; 
+            background: rgba(15, 23, 42, 0.6); 
+            border: 1px solid var(--border);
+            color: var(--text); 
+            padding: 14px 16px; 
+            border-radius: 12px;
+            font-size: 0.95rem; 
+            outline: none; 
+            font-family: inherit;
+            transition: border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
         }
-        input:focus { border-color: var(--primary); }
+        input:focus { 
+            border-color: var(--primary-h); 
+            background: rgba(15, 23, 42, 0.9);
+            box-shadow: 0 0 0 4px var(--primary-glow);
+        }
         .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         .input-label { font-size: 0.72rem; color: var(--text-sub); margin-bottom: 4px; }
 
         /* ── 자동완성 ── */
         #autocompleteList {
             position: absolute; top: calc(100% + 6px); left: 0; right: 0;
-            background: #1a2436; border: 1.5px solid var(--primary);
+            background: #111726; border: 1px solid var(--primary-h);
             border-radius: 14px; z-index: 9999;
             max-height: 280px; overflow-y: auto; display: none;
             box-shadow: 0 12px 40px rgba(0,0,0,.7);
+            backdrop-filter: blur(10px);
         }
+        #autocompleteList::-webkit-scrollbar { width: 6px; }
+        #autocompleteList::-webkit-scrollbar-track { background: transparent; }
+        #autocompleteList::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
         .ac-item {
             padding: 13px 16px; cursor: pointer;
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid rgba(255,255,255,0.03);
             display: flex; justify-content: space-between; align-items: center;
-            transition: background .15s;
+            transition: background 0.15s, padding-left 0.15s;
         }
         .ac-item:last-child { border-bottom: none; }
-        .ac-item:active, .ac-item:hover { background: rgba(99,102,241,.15); }
-        .ac-code { color: var(--text-sub); font-size: 0.78rem; font-weight: 700;
-            background: rgba(255,255,255,.06); padding: 2px 7px; border-radius: 5px; }
+        .ac-item:active, .ac-item:hover { 
+            background: rgba(99,102,241,.15); 
+            padding-left: 20px;
+        }
+        .ac-code { color: #818cf8; font-size: 0.78rem; font-weight: 800;
+            background: rgba(99,102,241,0.12); padding: 2px 7px; border-radius: 5px; }
 
         /* ── 버튼 ── */
         .btn-main {
-            width: 100%; padding: 15px; background: var(--primary);
-            border: none; color: white; border-radius: 12px;
-            font-weight: 800; font-size: 0.97rem; cursor: pointer;
-            transition: background .2s, transform .1s; font-family: inherit;
+            width: 100%; 
+            padding: 15px; 
+            background: linear-gradient(135deg, var(--primary), var(--primary-h));
+            border: none; 
+            color: white; 
+            border-radius: 12px;
+            font-weight: 800; 
+            font-size: 0.97rem; 
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+            font-family: inherit;
         }
-        .btn-main:active { transform: scale(.98); background: var(--primary-h); }
+        .btn-main:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.45);
+            filter: brightness(1.05);
+        }
+        .btn-main:active { transform: translateY(1px); }
         .btn-sub {
-            padding: 7px 14px; background: rgba(255,255,255,.05);
+            padding: 7px 14px; background: rgba(255,255,255,.04);
             border: 1px solid var(--border); color: var(--text);
             border-radius: 8px; font-weight: 600; cursor: pointer;
-            font-size: 0.82rem; font-family: inherit; transition: background .15s;
+            font-size: 0.82rem; font-family: inherit; transition: all 0.2s ease;
         }
-        .btn-sub:hover { background: rgba(255,255,255,.1); }
+        .btn-sub:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,0.15); transform: translateY(-1px); }
+        .btn-sub:active { transform: translateY(0); }
 
         /* ── 종목 카드 ── */
         .stock-item {
-            background: rgba(255,255,255,.025);
-            border-radius: 16px; padding: 16px;
-            margin-bottom: 10px; border: 1px solid var(--border);
-            transition: border-color .2s;
+            background: rgba(255,255,255,.02);
+            border-radius: 20px; padding: 18px;
+            margin-bottom: 12px; border: 1px solid var(--border);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .stock-item:hover { border-color: var(--border2); }
+        .stock-item:hover { 
+            background: rgba(255,255,255,.035); 
+            border-color: rgba(255,255,255,0.12);
+            transform: scale(1.01) translateY(-2px);
+        }
 
         .order-btns { display: flex; flex-direction: column; gap: 3px; margin-right: 11px; }
         .order-btn {
-            background: #1e2536; border: none; color: var(--text-sub);
+            background: rgba(255,255,255,0.03); border: 1px solid var(--border); color: var(--text-sub);
             width: 22px; height: 22px; border-radius: 5px; font-size: 9px;
-            cursor: pointer; transition: background .15s;
+            cursor: pointer; transition: all 0.15s ease;
+            display: flex; align-items: center; justify-content: center;
         }
-        .order-btn:hover { background: var(--border2); }
+        .order-btn:hover { background: rgba(255,255,255,0.08); color: white; border-color: rgba(255,255,255,0.2); }
 
         /* ── 차트 영역 ── */
-        .chart-area { display: none; margin-top: 14px; text-align: center; }
-        .chart-area.open { display: block; }
-        .chart-img {
-            width: 100%; border-radius: 10px;
-            filter: invert(93%) hue-rotate(180deg) brightness(1.05) contrast(1.1);
+        .chart-area { 
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1); 
+            text-align: center; 
         }
+        .chart-area.open { 
+            max-height: 520px; 
+        }
+        .chart-area-inner {
+            padding-top: 14px;
+        }
+        .chart-img {
+            width: 100%; border-radius: 12px;
+            filter: invert(93%) hue-rotate(180deg) brightness(1.05) contrast(1.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: transform 0.3s ease;
+        }
+        .chart-img:hover { transform: scale(1.015); }
         .period-row { display: flex; justify-content: center; gap: 7px; margin-bottom: 10px; }
         .period-btn {
-            background: rgba(255,255,255,.05); border: 1px solid var(--border);
+            background: rgba(255,255,255,.03); border: 1px solid var(--border);
             color: var(--text-sub); padding: 5px 14px; border-radius: 20px;
-            font-size: 0.82rem; cursor: pointer; font-weight: 600; font-family: inherit;
+            font-size: 0.82rem; cursor: pointer; font-weight: 700; font-family: inherit;
             transition: all .15s;
         }
-        .period-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .period-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+        .period-btn.active { 
+            background: var(--primary); 
+            color: white; 
+            border-color: var(--primary); 
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+        }
 
         /* ── 액션 버튼 ── */
         .actions { display: flex; gap: 7px; margin-top: 13px; }
         .action-btn {
-            flex: 1; padding: 8px 0; border-radius: 9px; font-weight: 700;
+            flex: 1; padding: 10px 0; border-radius: 10px; font-weight: 800;
             font-size: 0.78rem; cursor: pointer; border: none; font-family: inherit;
-            transition: opacity .15s;
+            transition: all 0.2s ease;
         }
-        .action-btn:active { opacity: .75; }
+        .action-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+        .action-btn:active { transform: translateY(0); }
 
         /* ── 모달 ── */
         .modal-overlay {
             display: none; position: fixed;
-            inset: 0; background: rgba(0,0,0,.82);
-            z-index: 500; backdrop-filter: blur(4px);
+            inset: 0; background: rgba(3, 7, 18, 0.8);
+            z-index: 500; backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            animation: fadeIn 0.25s ease;
         }
         .modal {
             display: none; position: fixed;
             top: 50%; left: 50%; transform: translate(-50%,-50%);
             width: 92%; max-width: 400px;
-            background: var(--card); border: 1px solid var(--border);
-            border-radius: 22px; padding: 24px; z-index: 501;
+            background: #111726; border: 1px solid var(--border);
+            border-radius: 28px; padding: 24px; z-index: 501;
             max-height: 90vh; overflow-y: auto;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            animation: modalScaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes modalScaleUp { 
+            from { transform: translate(-50%, -46%) scale(0.95); opacity: 0; } 
+            to { transform: translate(-50%, -50%) scale(1); opacity: 1; } 
         }
 
         /* ── 토스트 ── */
         #toast {
             position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-            background: #1e2d40; border: 1px solid var(--green);
+            background: rgba(30, 45, 64, 0.85); border: 1px solid var(--green);
             color: var(--text); padding: 10px 20px; border-radius: 30px;
             font-size: 0.88rem; font-weight: 600; z-index: 999;
             opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap;
+            backdrop-filter: blur(10px);
         }
         #toast.show { opacity: 1; }
 
@@ -208,7 +285,7 @@
         }
         .section-title span { font-weight: 800; font-size: 1.05rem; }
 
-        .footer { text-align: center; padding: 20px 0 0; color: var(--text-sub); font-size: 0.78rem; }
+        .footer { text-align: center; padding: 20px 0 0; color: var(--text-sub); font-size: 0.78rem; border-top: 1px solid rgba(255,255,255,0.02); margin-top: 20px; }
 
         /* ── 물타기 결과 ── */
         .water-result {
@@ -239,10 +316,11 @@
         #undoBar {
             display: none; position: fixed; bottom: 80px; left: 50%;
             transform: translateX(-50%);
-            background: #1e2d40; border: 1px solid var(--amber);
+            background: rgba(30, 45, 64, 0.85); border: 1px solid var(--amber);
             color: var(--text); padding: 10px 16px; border-radius: 30px;
             font-size: 0.85rem; font-weight: 600; z-index: 999;
-            display: none; align-items: center; gap: 12px; white-space: nowrap;
+            align-items: center; gap: 12px; white-space: nowrap;
+            backdrop-filter: blur(10px);
         }
         #undoBar button {
             background: var(--amber); color: #000; border: none;
@@ -627,9 +705,9 @@ async function runSearch(q, list) {
 }
 
 function acItem(flag, name, code) {
-    return `<div class="ac-item" data-name="${name}" data-code="${code}">
-        <span style="font-weight:700;">${flag} ${name}</span>
-        <span class="ac-code">${code}</span>
+    return `<div class="ac-item" data-name="${escHtml(name)}" data-code="${escHtml(code)}">
+        <span style="font-weight:700;">${escHtml(flag)} ${escHtml(name)}</span>
+        <span class="ac-code">${escHtml(code)}</span>
     </div>`;
 }
 
@@ -836,20 +914,22 @@ function renderList() {
             </div>
 
             <div class="chart-area" id="chart-${i}">
-                <div class="period-row" style="margin-top:12px;">
-                    <button class="period-btn active" onclick="changePeriod(${i},'${s.code}','day',this);event.stopPropagation();">일봉</button>
-                    <button class="period-btn" onclick="changePeriod(${i},'${s.code}','week',this);event.stopPropagation();">주봉</button>
-                    <button class="period-btn" onclick="changePeriod(${i},'${s.code}','month',this);event.stopPropagation();">월봉</button>
-                </div>
-                <img id="chart-img-${i}" class="chart-img"
-                    src="${chartUrl(s.code,'day')}"
-                    loading="lazy"
-                    onerror="this.src='https://dummyimage.com/600x300/151b2b/818cf8.png&text=차트+로딩+실패'"
-                    alt="${escHtml(s.name)} 차트">
-                <div class="actions">
-                    <button class="action-btn" style="background:rgba(16,185,129,.12);color:#34d399;" onclick="openWater(${i})">💧 물타기</button>
-                    <button class="action-btn" style="background:rgba(99,102,241,.12);color:#818cf8;" onclick="openEdit(${i})">🔍 진단/수정</button>
-                    <button class="action-btn" style="background:rgba(255,255,255,.05);color:var(--text-sub);" onclick="delStock(${i})">삭제</button>
+                <div class="chart-area-inner">
+                    <div class="period-row">
+                        <button class="period-btn active" onclick="changePeriod(${i},'${s.code}','day',this);event.stopPropagation();">일봉</button>
+                        <button class="period-btn" onclick="changePeriod(${i},'${s.code}','week',this);event.stopPropagation();">주봉</button>
+                        <button class="period-btn" onclick="changePeriod(${i},'${s.code}','month',this);event.stopPropagation();">월봉</button>
+                    </div>
+                    <img id="chart-img-${i}" class="chart-img"
+                        src="${chartUrl(s.code,'day')}"
+                        loading="lazy"
+                        onerror="this.src='https://dummyimage.com/600x300/151b2b/818cf8.png&text=차트+로딩+실패'"
+                        alt="${escHtml(s.name)} 차트">
+                    <div class="actions">
+                        <button class="action-btn" style="background:rgba(16,185,129,.12);color:#34d399;" onclick="openWater(${i})">💧 물타기</button>
+                        <button class="action-btn" style="background:rgba(99,102,241,.12);color:#818cf8;" onclick="openEdit(${i})">🔍 진단/수정</button>
+                        <button class="action-btn" style="background:rgba(255,255,255,.05);color:var(--text-sub);" onclick="delStock(${i})">삭제</button>
+                    </div>
                 </div>
             </div>`;
         frag.appendChild(div);
@@ -966,9 +1046,13 @@ function openWater(i) {
 }
 
 function calcWater() {
-    const money = parseFloat(document.getElementById('addMoney').value);
+    const moneyVal = document.getElementById('addMoney').value;
+    const money = parseFloat(moneyVal);
     const s = myStocks[curIdx];
-    if (!money || money <= 0 || !s.currentPrice) return;
+    if (!moneyVal || isNaN(money) || money <= 0 || !s || !s.currentPrice) {
+        document.getElementById('waterResult').style.display = 'none';
+        return;
+    }
 
     const addQty = Math.floor(money / s.currentPrice);
     if (addQty <= 0) {
@@ -980,7 +1064,11 @@ function calcWater() {
     const newTotal = s.avgPrice * s.quantity + s.currentPrice * addQty;
     const newQty = s.quantity + addQty;
     const newAvg = newTotal / newQty;
-    document.getElementById('wNewAvg').textContent = newAvg.toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+    const isKR = /^\d{6}$/.test(s.code);
+    const currSymbol = isKR ? '원' : '$';
+
+    document.getElementById('wNewAvg').textContent = newAvg.toLocaleString('en-US', { maximumFractionDigits: 2 }) + currSymbol;
     document.getElementById('wBuyQty').textContent = `${addQty}주 매수 · 총 ${newQty}주 보유 예정`;
     document.getElementById('waterResult').style.display = 'block';
 }
