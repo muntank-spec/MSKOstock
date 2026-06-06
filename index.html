@@ -332,9 +332,20 @@
         .live-dot {
             display: inline-block; width: 7px; height: 7px;
             background: var(--green); border-radius: 50%;
-            margin-right: 5px; vertical-align: middle;
+            margin-right: 6px; vertical-align: middle;
+            transition: background-color 0.3s ease;
         }
         .live-dot.stale { background: var(--amber); }
+        .live-dot.pulsing {
+            background: var(--primary-h);
+            box-shadow: 0 0 8px var(--primary-glow);
+            animation: pulse 1.2s infinite ease-in-out;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.85); opacity: 0.5; }
+            50% { transform: scale(1.25); opacity: 1; }
+            100% { transform: scale(0.85); opacity: 0.5; }
+        }
     </style>
 </head>
 <body>
@@ -499,6 +510,10 @@ let curIdx = -1;
 let deletedStock = null;
 let undoTimer = null;
 let searchTimer = null;
+let searchAbortController = null;
+let isRefreshing = false;
+const updatingIndices = new Set();
+const failedIndices = new Set();
 
 // ═══════════════════════════════════════════
 //  종목 DB — 오류 수정 완료
@@ -568,22 +583,44 @@ function autoCorrect(q) {
  * CORS 우회 프록시 사용 시 외부 서버에 요청이 노출됩니다.
  * 프록시 순서: allorigins → codetabs
  */
-async function fetchProxy(url, timeoutMs = 3000) {
+async function fetchProxy(url, timeoutMs = 3000, signal = null) {
     const proxies = [
+        `https://corsproxy.io/?${encodeURIComponent(url)}`,
         `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${Date.now()}`,
         `https://api.codetabs.com/v1/proxy/?quest=${url}&_=${Date.now()}`
     ];
     for (const proxy of proxies) {
         const ctrl = new AbortController();
         const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+        
+        let combinedSignal = ctrl.signal;
+        let abortListener = null;
+        if (signal) {
+            if (signal.aborted) {
+                clearTimeout(tid);
+                throw new DOMException('Aborted', 'AbortError');
+            }
+            if (typeof AbortSignal.any === 'function') {
+                combinedSignal = AbortSignal.any([ctrl.signal, signal]);
+            } else {
+                abortListener = () => ctrl.abort();
+                signal.addEventListener('abort', abortListener);
+            }
+        }
+
         try {
-            const res = await fetch(proxy, { signal: ctrl.signal, cache: 'no-store' });
+            const res = await fetch(proxy, { signal: combinedSignal, cache: 'no-store' });
             clearTimeout(tid);
+            if (abortListener) signal.removeEventListener('abort', abortListener);
             if (!res.ok) continue;
             const json = await res.json();
             return proxy.includes('allorigins') ? JSON.parse(json.contents) : json;
-        } catch {
+        } catch (err) {
             clearTimeout(tid);
+            if (abortListener && signal) signal.removeEventListener('abort', abortListener);
+            if (signal && signal.aborted) {
+                throw err;
+            }
         }
     }
     throw new Error('네트워크 응답 없음');
@@ -647,15 +684,28 @@ function naverSearch(query) {
 function onSearchInput(q) {
     clearTimeout(searchTimer);
     const list = document.getElementById('autocompleteList');
-    if (!q.trim()) { list.style.display = 'none'; return; }
+    if (!q.trim()) {
+        list.style.display = 'none';
+        if (searchAbortController) {
+            searchAbortController.abort();
+            searchAbortController = null;
+        }
+        return;
+    }
 
     list.innerHTML = '<div style="padding:14px;color:var(--text-sub);text-align:center;font-size:0.85rem;">⚡ 검색 중...</div>';
     list.style.display = 'block';
 
-    searchTimer = setTimeout(() => runSearch(q, list), 280);
+    searchTimer = setTimeout(() => {
+        if (searchAbortController) {
+            searchAbortController.abort();
+        }
+        searchAbortController = new AbortController();
+        runSearch(q, list, searchAbortController.signal);
+    }, 280);
 }
 
-async function runSearch(q, list) {
+async function runSearch(q, list, signal) {
     const smart = autoCorrect(q);
     const added = new Set();
     let html = '';
@@ -668,11 +718,17 @@ async function runSearch(q, list) {
             html += acItem(s.f, s.n, s.c);
             added.add(s.c);
         });
-    if (html) { list.innerHTML = html; bindAcItems(list); }
+    if (html) {
+        if (signal.aborted) return;
+        list.innerHTML = html;
+        bindAcItems(list);
+    }
 
     // 2) 네이버 라이브
     try {
+        if (signal.aborted) return;
         const items = await naverSearch(smart);
+        if (signal.aborted) return;
         let changed = false;
         items.forEach(item => {
             const name = Array.isArray(item[0]) ? item[0][0] : item[0];
@@ -681,12 +737,18 @@ async function runSearch(q, list) {
             html += acItem('🇰🇷', name, code);
             added.add(code); changed = true;
         });
-        if (changed) { list.innerHTML = html; bindAcItems(list); }
+        if (changed) {
+            if (signal.aborted) return;
+            list.innerHTML = html;
+            bindAcItems(list);
+        }
     } catch {}
 
     // 3) 야후 라이브
     try {
-        const data = await fetchProxy(`https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(smart)}&quotesCount=5`, 4000);
+        if (signal.aborted) return;
+        const data = await fetchProxy(`https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(smart)}&quotesCount=5`, 4000, signal);
+        if (signal.aborted) return;
         let changed = false;
         (data?.quotes || []).forEach(q => {
             if (!['EQUITY','ETF'].includes(q.quoteType)) return;
@@ -696,9 +758,16 @@ async function runSearch(q, list) {
             html += acItem('🇺🇸', name.replace(/'/g, '&#39;'), q.symbol);
             added.add(q.symbol); changed = true;
         });
-        if (changed) { list.innerHTML = html; bindAcItems(list); }
-    } catch {}
+        if (changed) {
+            if (signal.aborted) return;
+            list.innerHTML = html;
+            bindAcItems(list);
+        }
+    } catch (err) {
+        if (err.name === 'AbortError') return;
+    }
 
+    if (signal.aborted) return;
     if (!html) {
         list.innerHTML = '<div style="padding:14px;color:var(--text-sub);text-align:center;font-size:0.85rem;">결과가 없습니다 🥲</div>';
     }
@@ -744,6 +813,7 @@ async function selectStock(name, code) {
 // ═══════════════════════════════════════════
 
 async function addStock() {
+    if (isRefreshing) return toast('⚠️ 시세 갱신 중에는 종목을 추가할 수 없습니다.');
     const name = document.getElementById('sName').value.trim();
     const code = document.getElementById('sCode').value.trim();
     const avg = parseFloat(document.getElementById('sAvg').value);
@@ -774,6 +844,7 @@ async function addStock() {
 }
 
 function delStock(idx) {
+    if (isRefreshing) return toast('⚠️ 시세 갱신 중에는 종목을 삭제할 수 없습니다.');
     deletedStock = { stock: { ...myStocks[idx] }, idx };
     myStocks.splice(idx, 1);
     Store.set('myStocks', myStocks);
@@ -788,6 +859,7 @@ function delStock(idx) {
 }
 
 function undoDelete() {
+    if (isRefreshing) return toast('⚠️ 시세 갱신 중에는 종목을 복구할 수 없습니다.');
     if (!deletedStock) return;
     clearTimeout(undoTimer);
     myStocks.splice(deletedStock.idx, 0, deletedStock.stock);
@@ -799,6 +871,7 @@ function undoDelete() {
 }
 
 function moveStock(idx, dir) {
+    if (isRefreshing) return toast('⚠️ 시세 갱신 중에는 이동할 수 없습니다.');
     const to = idx + dir;
     if (to < 0 || to >= myStocks.length) return;
     [myStocks[idx], myStocks[to]] = [myStocks[to], myStocks[idx]];
@@ -811,27 +884,59 @@ function moveStock(idx, dir) {
 // ═══════════════════════════════════════════
 
 async function refreshAll() {
+    if (isRefreshing) return;
+    isRefreshing = true;
+
     const btn = document.getElementById('refreshBtn');
+    const addBtn = document.getElementById('addBtn');
     btn.textContent = '⏳ 갱신 중';
     btn.disabled = true;
+    if (addBtn) addBtn.disabled = true;
     showErr('');
 
     try {
         await updateExchangeRate();
     } catch {}
 
-    const results = await Promise.allSettled(
-        myStocks.map(async (s, i) => {
+    updatingIndices.clear();
+    failedIndices.clear();
+
+    // Mark all as loading initially
+    for (let i = 0; i < myStocks.length; i++) {
+        updatingIndices.add(i);
+    }
+    renderList();
+
+    let failedCount = 0;
+    for (let i = 0; i < myStocks.length; i++) {
+        const s = myStocks[i];
+        updatingIndices.add(i);
+        renderList();
+
+        try {
             const d = await getPrice(s.code);
             myStocks[i].currentPrice = d.price;
             myStocks[i].change = d.change;
             myStocks[i].changeRate = d.changeRate;
             if (d.name && (!s.name || s.name === s.code)) myStocks[i].name = d.name;
-        })
-    );
+            failedIndices.delete(i);
+        } catch (err) {
+            console.error(`Error fetching ${s.code}:`, err);
+            failedIndices.add(i);
+            failedCount++;
+        } finally {
+            updatingIndices.delete(i);
+            renderList();
+        }
 
-    const failed = results.filter(r => r.status === 'rejected').length;
-    if (failed > 0) showErr(`⚠️ ${failed}개 종목 가격 업데이트에 실패했습니다. 시장 시간 외이거나 네트워크를 확인하세요.`);
+        if (i < myStocks.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 80));
+        }
+    }
+
+    if (failedCount > 0) {
+        showErr(`⚠️ ${failedCount}개 종목 가격 업데이트에 실패했습니다. 시장 시간 외이거나 네트워크를 확인하세요.`);
+    }
 
     const now = new Date();
     const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
@@ -839,7 +944,10 @@ async function refreshAll() {
     Store.set('lastUpdate', ts);
     renderList();
 
-    btn.textContent = '🔄 갱신'; btn.disabled = false;
+    btn.textContent = '🔄 갱신';
+    btn.disabled = false;
+    if (addBtn) addBtn.disabled = false;
+    isRefreshing = false;
 }
 
 // ═══════════════════════════════════════════
@@ -884,6 +992,15 @@ function renderList() {
         const chgSign = chg > 0 ? '▲' : (chg < 0 ? '▼' : '—');
         const chgStr = chg !== 0 ? `${chgSign} ${Math.abs(chg).toLocaleString('en-US')} (${chgR > 0 ? '+' : ''}${chgR.toFixed(2)}%)` : '—';
 
+        let statusDot = '';
+        if (updatingIndices.has(i)) {
+            statusDot = `<span class="live-dot pulsing" title="갱신 중"></span>`;
+        } else if (failedIndices.has(i)) {
+            statusDot = `<span class="live-dot" style="background: var(--red);" title="갱신 실패"></span>`;
+        } else {
+            statusDot = `<span class="live-dot" title="최신 상태"></span>`;
+        }
+
         const div = document.createElement('div');
         div.className = 'stock-item';
         div.innerHTML = `
@@ -895,8 +1012,10 @@ function renderList() {
                 <div style="flex:1;cursor:pointer;" onclick="toggleChart(${i})">
                     <div style="display:flex;justify-content:space-between;align-items:flex-start;">
                         <div>
-                            <div style="font-weight:800;font-size:1.02rem;">${escHtml(s.name)}</div>
-                            <div style="font-size:0.78rem;color:var(--text-sub);margin-top:2px;">
+                            <div style="font-weight:800;font-size:1.02rem;display:flex;align-items:center;gap:2px;">
+                                ${statusDot}${escHtml(s.name)}
+                            </div>
+                            <div style="font-size:0.78rem;color:var(--text-sub);margin-top:2px;padding-left:13px;">
                                 평단 ${s.avgPrice.toLocaleString('en-US')}${curr} × ${s.quantity}주
                             </div>
                         </div>
@@ -1011,6 +1130,7 @@ function openEdit(i) {
 }
 
 function saveEdit() {
+    if (isRefreshing) return toast('⚠️ 시세 갱신 중에는 수정할 수 없습니다.');
     const s = myStocks[curIdx];
     s.code = document.getElementById('uCode').value.trim() || s.code;
     s.avgPrice = parseFloat(document.getElementById('uAvg').value) || s.avgPrice;
