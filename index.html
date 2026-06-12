@@ -585,9 +585,9 @@ function autoCorrect(q) {
  */
 async function fetchProxy(url, timeoutMs = 3000, signal = null) {
     const proxies = [
-        `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
         `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${Date.now()}`,
-        `https://api.codetabs.com/v1/proxy/?quest=${url}&_=${Date.now()}`
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
     ];
     for (const proxy of proxies) {
         const ctrl = new AbortController();
@@ -628,11 +628,14 @@ async function fetchProxy(url, timeoutMs = 3000, signal = null) {
 
 async function updateExchangeRate() {
     try {
-        const data = await fetchProxy('https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?interval=1d&range=1d');
-        const rate = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-        if (rate && rate > 500) {
-            exchangeRate = rate;
-            Store.set('exchangeRate', exchangeRate);
+        const res = await fetch('https://open.er-api.com/v6/latest/USD');
+        if (res.ok) {
+            const data = await res.json();
+            const rate = data?.rates?.KRW;
+            if (rate && rate > 500) {
+                exchangeRate = rate;
+                Store.set('exchangeRate', exchangeRate);
+            }
         }
     } catch { /* 기존 캐시값 사용 */ }
 }
@@ -652,15 +655,26 @@ async function getPrice(code) {
         const changeRate = Math.abs(rawRate) * sign;
         return { price, name: data.stockName, change, changeRate };
     } else {
-        const safe = ticker.replace(/-/g, '.');
-        const data = await fetchProxy(`https://query1.finance.yahoo.com/v8/finance/chart/${safe}?interval=1d&range=2d`);
-        const meta = data?.chart?.result?.[0]?.meta;
-        if (!meta) throw new Error('야후 데이터 없음');
-        const price = +meta.regularMarketPrice.toFixed(2);
-        const prev = +meta.chartPreviousClose.toFixed(2);
-        const change = +(price - prev).toFixed(2);
-        const changeRate = +((change / prev) * 100).toFixed(2);
-        return { price, name: ticker, change, changeRate };
+        const suffixes = ['.O', '.N', '.A'];
+        const hasSuffix = /\.[ONA]$/i.test(ticker);
+        const candidates = hasSuffix ? [ticker] : suffixes.map(s => ticker + s);
+
+        for (const cand of candidates) {
+            try {
+                const url = `https://api.stock.naver.com/stock/${cand}/basic`;
+                const data = await fetchProxy(url);
+                if (data && data.closePrice) {
+                    const price = parseFloat(String(data.closePrice).replace(/,/g, ''));
+                    const sign = data.compareToPreviousPrice?.code === '5' ? -1 : 1;
+                    const change = parseFloat(String(data.compareToPreviousClosePrice || '0').replace(/,/g, '')) * sign;
+                    const changeRate = parseFloat(String(data.fluctuationsRatio || '0').replace(/,/g, '')) * sign;
+                    return { price, name: data.stockName || cand, change, changeRate, matchedCode: cand };
+                }
+            } catch (e) {
+                if (hasSuffix) throw e;
+            }
+        }
+        throw new Error('US stock data fetch failed');
     }
 }
 
@@ -829,7 +843,8 @@ async function addStock() {
         const d = await getPrice(code);
         myStocks.push({
             name: name || d.name || code,
-            code, avgPrice: avg, quantity: qty,
+            code: d.matchedCode || code,
+            avgPrice: avg, quantity: qty,
             currentPrice: d.price, change: d.change, changeRate: d.changeRate
         });
         Store.set('myStocks', myStocks);
@@ -919,6 +934,9 @@ async function refreshAll() {
             myStocks[i].change = d.change;
             myStocks[i].changeRate = d.changeRate;
             if (d.name && (!s.name || s.name === s.code)) myStocks[i].name = d.name;
+            if (d.matchedCode && s.code !== d.matchedCode) {
+                myStocks[i].code = d.matchedCode;
+            }
             failedIndices.delete(i);
         } catch (err) {
             console.error(`Error fetching ${s.code}:`, err);
@@ -1091,8 +1109,9 @@ function chartUrl(code, period = 'day') {
     if (isKR) {
         return `https://ssl.pstatic.net/imgfinance/chart/item/candle/${period}/${ticker}.png?${ts}`;
     } else {
+        const cleanTicker = ticker.split('.')[0].replace(/_/g, '-');
         const p = period === 'week' ? 'w' : (period === 'month' ? 'm' : 'd');
-        return `https://finviz.com/chart.ashx?t=${ticker}&ty=c&ta=0&p=${p}&_=${ts}`;
+        return `https://finviz.com/chart.ashx?t=${cleanTicker}&ty=c&ta=0&p=${p}&_=${ts}`;
     }
 }
 
